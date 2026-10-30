@@ -1,10 +1,13 @@
 {
   "/_global-error/page": "/_global-error",
   "/_not-found/page": "/_not-found",
+  "/about/page": "/about",
+  "/add-listing/page": "/add-listing",
   "/admin/page": "/admin",
   "/auth/page": "/auth",
   "/auth/reset/page": "/auth/reset",
   "/browse/page": "/browse",
+  "/commercial/page": "/commercial",
   "/dashboard/admin/page": "/dashboard/admin",
   "/dashboard/edit/[id]/page": "/dashboard/edit/[id]",
   "/dashboard/new/page": "/dashboard/new",
@@ -13,6 +16,8 @@
   "/favicon.ico/route": "/favicon.ico",
   "/favorites/page": "/favorites",
   "/listing/[id]/page": "/listing/[id]",
+  "/my-listings/page": "/my-listings",
   "/page": "/",
+  "/profile/me/page": "/profile/me",
   "/profile/page": "/profile"
 }

@@ -4,6 +4,14 @@
       "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
     ],
+    "[project]/app/about/page": [
+      "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
+      "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
+    ],
+    "[project]/app/add-listing/page": [
+      "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
+      "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
+    ],
     "[project]/app/admin/page": [
       "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
@@ -17,6 +25,10 @@
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
     ],
     "[project]/app/browse/page": [
+      "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
+      "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
+    ],
+    "[project]/app/commercial/page": [
       "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
     ],
@@ -48,7 +60,15 @@
       "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
     ],
+    "[project]/app/my-listings/page": [
+      "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
+      "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
+    ],
     "[project]/app/page": [
+      "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
+      "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
+    ],
+    "[project]/app/profile/me/page": [
       "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
     ],
