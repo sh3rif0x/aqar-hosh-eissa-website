@@ -8,6 +8,7 @@ import { APP_NAME } from "@/lib/config";
 import { useAuth } from "@/lib/AuthContext";
 import { auth } from "@/lib/api";
 
+import HeaderActions from "@/components/HeaderActions";
 export default function Navbar() {
   const { user, me, isAdmin, loading } = useAuth();
   const [open, setOpen] = useState(false);
@@ -28,21 +29,7 @@ export default function Navbar() {
           {!loading && !user && <Link href="/auth" className="ghost"><LogIn size={16} /> دخول</Link>}
           <Link href={user ? "/dashboard" : "/auth"} className="btn"><Plus size={15} /> أضف إعلانك</Link>
           {user && (
-            <div className="profile">
-              <button className="profile-btn" onClick={() => setOpen(!open)} aria-label="الحساب">
-                {me?.avatar_url ? <img src={me.avatar_url} alt="" /> : <User size={18} />}
-              </button>
-              {open && (
-                <div className="menu" onMouseLeave={() => setOpen(false)}>
-                  <div className="menu-head"><strong>{name}</strong><small>{user.email}</small></div>
-                  <Link href="/profile" onClick={() => setOpen(false)}><User size={15} /> حسابي</Link>
-                  <Link href="/dashboard" onClick={() => setOpen(false)}><LayoutDashboard size={15} /> إعلاناتي</Link>
-                  <Link href="/favorites" onClick={() => setOpen(false)}><Heart size={15} /> المحفوظة</Link>
-                  {isAdmin && <Link href="/admin" onClick={() => setOpen(false)}><Shield size={15} /> لوحة الإدارة</Link>}
-                  <button onClick={logout}><LogOut size={15} /> تسجيل الخروج</button>
-                </div>
-              )}
-            </div>
+            <HeaderActions />
           )}
         </div>
       </div>
