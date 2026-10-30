@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Home, Building2, Building, Mountain, Store, ArrowLeft } from "lucide-react";
 import { CATEGORIES } from "@/lib/data";
 
+const CATMAP = { apartment: 1, villa: 2, farm: 3, land: 4, building: 5, shop: 6 };
 const ICONS = { home: Home, building: Building2, town: Building, land: Mountain, store: Store };
 
 export default function CategoryBar() {
@@ -13,7 +14,7 @@ export default function CategoryBar() {
             const Icon = ICONS[icon];
             return (
               <li key={key}>
-                <Link href={`/browse?type=${key}`}><Icon size={16} /> {label}</Link>
+                <Link href={`/browse?cat=${CATMAP[key]}`}><Icon size={16} /> {label}</Link>
               </li>
             );
           })}

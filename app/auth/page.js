@@ -1,8 +1,13 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, Lock, User, Phone, Eye, EyeOff, Loader2 } from "lucide-react";
 import { auth, profile } from "@/lib/api";
+
+const REASONS = {
+  favorite: "سجّل مجاناً واحفظ العقارات اللي عجبتك واحصل على إشعار عند نزول عقار بالمواصفات اللي بتدور عليها.",
+  add: "سجّل مجاناً لنشر عقارك وإدارة إعلاناتك.",
+};
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 48 48">
@@ -13,15 +18,17 @@ const GoogleIcon = () => (
   </svg>
 );
 
-export default function AuthPage() {
+function AuthPage() {
   const router = useRouter();
+  const reason = useSearchParams().get("reason");
   const [mode, setMode] = useState("login");
   const [f, setF] = useState({ full_name: "", phone: "", email: "", password: "" });
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const [msg, setMsg] = useState("");
+  const [info, setInfo] = useState("");
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const goNext = () => { router.push(reason === "add" ? "/dashboard" : "/"); router.refresh(); };
 
   const google = async () => {
     setErr("");
@@ -30,56 +37,64 @@ export default function AuthPage() {
   };
 
   const submit = async (e) => {
-    e.preventDefault(); setErr(""); setMsg(""); setBusy(true);
+    e.preventDefault(); setErr(""); setInfo(""); setBusy(true);
     try {
-      if (mode === "login") {
-        const { error } = await auth.signIn(f.email, f.password);
+      if (mode === "forgot") {
+        const { error } = await auth.resetPassword(f.email);
         if (error) throw error;
-        router.push("/"); router.refresh();
-      } else {
-        const { data, error } = await auth.signUp(f.email, f.password, { full_name: f.full_name, phone: f.phone });
-        if (error) throw error;
-        if (data.session) {
-          try { await profile.update({ full_name: f.full_name, phone: f.phone }); } catch {}
-          router.push("/"); router.refresh();
-        } else setMsg("تم إنشاء الحساب. تحقق من بريدك الإلكتروني لتأكيده ثم سجّل الدخول.");
+        setInfo("تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك. افتح الرسالة واتبع الرابط.");
+        return;
       }
+      if (mode === "signup") {
+        const { error } = await auth.signUp(f.email, f.password, { full_name: f.full_name, phone: f.phone });
+        if (error && !/already registered/i.test(error.message)) throw error;
+      }
+      const { data, error } = await auth.signIn(f.email, f.password);
+      if (error) throw error;
+      if (mode === "signup" && data.session) {
+        try { await profile.update({ full_name: f.full_name, phone: f.phone }); } catch {}
+      }
+      goNext();
     } catch (x) {
-      setErr(x.message?.includes("Invalid login") ? "البريد أو كلمة المرور غير صحيحة" : x.message);
+      const m = x.message || "";
+      setErr(/invalid login/i.test(m) ? "البريد أو كلمة المرور غير صحيحة" : /not confirmed/i.test(m) ? "الحساب غير مفعّل، جرّب مرة أخرى بعد لحظات." : m);
     } finally { setBusy(false); }
   };
 
   return (
     <main className="auth-wrap">
       <form className="auth-card" onSubmit={submit}>
-        <h1>{mode === "login" ? "تسجيل الدخول" : "إنشاء حساب جديد"}</h1>
+        <h1>{mode === "login" ? "تسجيل الدخول" : mode === "signup" ? "إنشاء حساب جديد" : "نسيت كلمة المرور"}</h1>
+        {REASONS[reason] && <p className="ok">{REASONS[reason]}</p>}
 
-        <button type="button" className="google-btn" onClick={google}>
-          <GoogleIcon /> المتابعة باستخدام Google
-        </button>
-        <div className="or"><span>أو</span></div>
+        {mode !== "forgot" && <><button type="button" className="google-btn" onClick={google}><GoogleIcon /> المتابعة باستخدام Google</button>
+        <div className="or"><span>أو</span></div></>}
 
-        <div className="auth-tabs">
+        {mode !== "forgot" && <div className="auth-tabs">
           <button type="button" className={mode === "login" ? "on" : ""} onClick={() => setMode("login")}>دخول</button>
           <button type="button" className={mode === "signup" ? "on" : ""} onClick={() => setMode("signup")}>حساب جديد</button>
-        </div>
+        </div>}
 
         {mode === "signup" && (
           <>
             <label className="in"><User size={16} /><input required placeholder="الاسم الكامل" value={f.full_name} onChange={set("full_name")} /></label>
-            <label className="in"><Phone size={16} /><input placeholder="رقم الهاتف" value={f.phone} onChange={set("phone")} /></label>
+            <label className="in"><Phone size={16} /><input placeholder="رقم الهاتف (اختياري)" value={f.phone} onChange={set("phone")} /></label>
           </>
         )}
         <label className="in"><Mail size={16} /><input required type="email" placeholder="البريد الإلكتروني" value={f.email} onChange={set("email")} /></label>
-        <label className="in"><Lock size={16} />
+        {mode !== "forgot" && <label className="in"><Lock size={16} />
           <input required minLength={6} type={show ? "text" : "password"} placeholder="كلمة المرور" value={f.password} onChange={set("password")} />
           <button type="button" onClick={() => setShow(!show)} aria-label="إظهار">{show ? <EyeOff size={16} /> : <Eye size={16} />}</button>
-        </label>
+        </label>}
 
+        {mode === "login" && <button type="button" className="linkbtn start" onClick={() => { setMode("forgot"); setErr(""); }}>نسيت كلمة المرور؟</button>}
         {err && <p className="err">{err}</p>}
-        {msg && <p className="ok">{msg}</p>}
-        <button className="btn full" disabled={busy}>{busy ? <Loader2 size={16} className="spin" /> : mode === "login" ? "دخول" : "إنشاء الحساب"}</button>
+        {info && <p className="ok">{info}</p>}
+        <button className="btn full" disabled={busy}>{busy ? <Loader2 size={16} className="spin" /> : mode === "login" ? "دخول" : mode === "signup" ? "إنشاء الحساب" : "إرسال رابط الاستعادة"}</button>
+        {mode === "forgot" && <button type="button" className="linkbtn" onClick={() => { setMode("login"); setInfo(""); }}>الرجوع لتسجيل الدخول</button>}
       </form>
     </main>
   );
 }
+
+export default function Page() { return <Suspense><AuthPage /></Suspense>; }

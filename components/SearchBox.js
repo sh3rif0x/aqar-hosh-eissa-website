@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, ArrowLeft, Search, Home, Key } from "lucide-react";
+import { Search, Home, Key } from "lucide-react";
 import { REGIONS, PROPERTY_TYPES } from "@/lib/data";
 
 const COUNT = ["أي", "1", "2", "3", "4", "5+"];
@@ -17,17 +17,16 @@ export default function SearchBox() {
     const p = new URLSearchParams({ deal });
     if (q.text) p.set("search", q.text);
     if (q.min) p.set("min", q.min);
+    const ci = PROPERTY_TYPES.indexOf(q.type); const ri = REGIONS.indexOf(q.region);
+    const CATIDS = { "شقة": 1, "فيلا": 2, "أرض زراعية": 3, "أرض بناء": 4, "مبنى": 5, "محل": 6 };
+    if (CATIDS[q.type]) p.set("cat", CATIDS[q.type]);
+    if (q.region === "حوش عيسى") p.set("region", 1);
     if (q.max) p.set("max", q.max);
     router.push(`/browse?${p.toString()}`);
   };
 
   return (
     <section className="search">
-      <div className="ai">
-        <Sparkles size={16} className="sp" />
-        <input placeholder="ابحث بالذكاء الاصطناعي — مثال: شقة 3 غرف في حوش عيسى" />
-        <button aria-label="بحث ذكي"><ArrowLeft size={16} /></button>
-      </div>
 
       <div className="tabs">
         <button className={`tab ${deal === "sale" ? "on" : ""}`} onClick={() => setDeal("sale")}><Home size={14} /> شراء</button>
