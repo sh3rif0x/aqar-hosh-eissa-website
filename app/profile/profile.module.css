@@ -1,0 +1,20 @@
+.wrap { max-width: 660px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+.wrap h1 { font-size: 1.6rem; margin: 0 0 1.2rem; }
+.card { background: #fff; border: 1px solid #e4e0d6; border-radius: 16px; padding: 1.4rem; margin-bottom: 1.2rem; display: grid; gap: .5rem; box-shadow: 0 1px 6px rgba(0,0,0,.04); }
+.card h3 { margin: 0 0 .4rem; }
+.card label { font-size: .85rem; margin-top: .4rem; }
+.card input { padding: .65rem .85rem; border: 1px solid #e4e0d6; border-radius: 10px; font: inherit; width: 100%; }
+.card input:focus { outline: 2px solid #1f4d43; outline-offset: -1px; }
+.head { display: flex; align-items: center; gap: .9rem; padding-bottom: 1rem; margin-bottom: .5rem; border-bottom: 1px solid #e4e0d6; }
+.head strong { display: block; }
+.head small { color: #6b7a76; }
+.avatar { width: 52px; height: 52px; border-radius: 50%; background: #1b3a33; color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 1.1rem; }
+.avatarBox { position: relative; cursor: pointer; margin: 0 !important; }
+.avatar { background-size: cover; background-position: center; }
+.cam { position: absolute; bottom: -2px; inset-inline-end: -2px; background: #fff; border: 1px solid #e4e0d6; border-radius: 50%; width: 24px; height: 24px; display: grid; place-items: center; font-size: .75rem; }
+.link { display: block; border: 0; background: none; color: #c2410c; font: inherit; font-size: .8rem; cursor: pointer; padding: 0; margin-top: .2rem; }
+.btn { justify-self: start; margin-top: .8rem; padding: .6rem 1.3rem; border: 0; border-radius: 10px; background: #1b3a33; color: #fff; font: inherit; cursor: pointer; }
+.btn:disabled { opacity: .6; cursor: not-allowed; }
+.toast { position: fixed; bottom: 1.2rem; inset-inline-start: 1.2rem; padding: .7rem 1.1rem; border-radius: 12px; color: #fff; z-index: 50; max-width: 90vw; }
+.ok { background: #1f4d43; }
+.bad { background: #c2410c; }
