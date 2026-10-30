@@ -15,7 +15,7 @@ export default function Faq() {
             عقار حوش عيسى هو منصتك لبيع وإيجار الشقق والفلل والمحلات والمباني والأراضي الزراعية وأراضي البناء
             في حوش عيسى والمناطق المحيطة، مع تواصل مباشر بين المالك والمشتري.
           </p>
-          <Link href="/dashboard" className="btn"><Plus size={15} /> أضف إعلانك مجاناً</Link>
+          <Link href="/add-listing" className="btn"><Plus size={15} /> أضف إعلانك مجاناً</Link>
         </div>
       </section>
       <section className="faq">

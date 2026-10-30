@@ -25,9 +25,9 @@ export default function Navbar() {
           {NAV_LINKS.map((l, i) => <Link key={l.href} href={l.href} className={i === 0 ? "active" : ""}>{l.label}</Link>)}
         </nav>
         <div className="nav-actions">
-          <Link href="/favorites" className="ghost"><Heart size={16} /> المحفوظة</Link>
+          
           {!loading && !user && <Link href="/auth" className="ghost"><LogIn size={16} /> دخول</Link>}
-          <Link href={user ? "/dashboard" : "/auth"} className="btn"><Plus size={15} /> أضف إعلانك</Link>
+          <Link href="/add-listing" className="btn"><Plus size={15} /> أضف إعلانك</Link>
           {user && (
             <HeaderActions />
           )}

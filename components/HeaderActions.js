@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, User, ChevronDown, UserCog, LayoutDashboard, ShieldCheck, LogOut } from "lucide-react";
+import { Bell, User, ChevronDown, UserCog, LayoutDashboard, ShieldCheck, LogOut, Heart } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
 import AccountTypeGate from "./AccountTypeGate";
@@ -64,7 +64,9 @@ export function NotificationBell() {
   };
 
   return (
-    <div className={styles.wrap} ref={ref}>
+    <>
+<Link href="/favorites" aria-label="المفضلة" title="المفضلة" style={{ display: "grid", placeItems: "center", width: 40, height: 40, borderRadius: "50%", color: "inherit" }}><Heart size={20} /></Link>
+<div className={styles.wrap} ref={ref}>
       <button className={styles.trigger} onClick={toggle} aria-label="الإشعارات" aria-expanded={open}>
         <Bell size={19} />
         {data.unread > 0 && <span className={styles.dot}>{data.unread > 9 ? "9+" : data.unread}</span>}
@@ -88,6 +90,7 @@ export function NotificationBell() {
         </div>
       )}
     </div>
+</>
   );
 }
 
@@ -127,7 +130,9 @@ export function UserMenu() {
           </div>
           <Link href="/profile" onClick={() => setOpen(false)} role="menuitem"><UserCog size={16} /> الحساب الشخصي</Link>
           {isAdmin && <Link href="/dashboard/admin" onClick={() => setOpen(false)} role="menuitem"><ShieldCheck size={16} /> لوحة الإدارة</Link>}
-          {(isAdmin || me?.account_type === "owner" || me?.account_type === "broker") && (
+          <Link href="/my-listings" onClick={() => setOpen(false)} role="menuitem"><LayoutDashboard size={16} /> إعلاناتي</Link>
+<Link href="/favorites" onClick={() => setOpen(false)} role="menuitem"><LayoutDashboard size={16} /> المفضلة</Link>
+{(isAdmin || me?.account_type === "owner" || me?.account_type === "broker") && (
             <Link href="/dashboard" onClick={() => setOpen(false)} role="menuitem"><LayoutDashboard size={16} /> لوحة المعلن</Link>
           )}
           <button onClick={logout} role="menuitem" className={styles.out}><LogOut size={16} /> تسجيل الخروج</button>

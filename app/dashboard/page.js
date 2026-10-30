@@ -7,6 +7,7 @@ import { listings, profile } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import { normalize, items } from "@/lib/normalize";
 
+import AccountTypeBadge from "@/components/AccountTypeBadge";
 const STATUS = { pending: "قيد المراجعة", published: "منشور", rejected: "مرفوض" };
 
 export default function Page() { return <Suspense><Dashboard /></Suspense>; }
@@ -43,10 +44,7 @@ function Dashboard() {
       </header>
 
       <div className="acct">
-        <div className="acct-types">
-          <button className={quota.account_type === "owner" ? "on" : ""} onClick={() => choose("owner")}><User size={18} /> مالك مباشر<small>إعلانات مجانية بلا حد</small></button>
-          <button className={quota.account_type === "broker" ? "on" : ""} onClick={() => office.trim() || quota.account_type === "broker" ? choose("broker") : setErr("اكتب اسم المكتب أولاً")}><Building size={18} /> مكتب / سمسار<small>أول 3 إعلانات مجاناً</small></button>
-        </div>
+        <AccountTypeBadge />
         {quota.account_type !== "owner" || true ? (
           <input className="office" placeholder="اسم المكتب العقاري (للمكاتب والسماسرة)" value={office || me?.office_name || ""} onChange={(e) => setOffice(e.target.value)} />
         ) : null}
