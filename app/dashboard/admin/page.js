@@ -1,0 +1,816 @@
+"use client";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Bell } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/AuthContext";
+import styles from "../dashboard.module.css";
+
+/* =====================================================================
+   لوحة الإدارة — ملف واحد لكل الأقسام. القسم يُحدد بالرابط:  ?s=<group>.<sub>
+   الصلاحيات الحقيقية مفروضة في قاعدة البيانات (RPC + RLS)، وهذا الملف يخفي/يعرض فقط.
+   ===================================================================== */
+
+const LIMIT = 20;
+const PERMS = {
+  listings: "إدارة الإعلانات", users: "إدارة المستخدمين", categories: "التصنيفات",
+  locations: "المواقع", reports: "البلاغات", notifications: "الإشعارات",
+};
+const ERR = {
+  forbidden: "ليس لديك صلاحية لهذا الإجراء", cannot_change_own_role: "لا يمكنك تغيير دورك بنفسك",
+  cannot_promote_super_admin: "الترقية إلى Super Admin غير مسموحة", last_super_admin: "لا يمكن إزالة آخر Super Admin",
+  invalid_transition: "تغيير الدور غير مسموح", user_not_found: "المستخدم غير موجود", cannot_block_self: "لا يمكنك حظر نفسك",
+  cannot_block_admin: "فقط Super Admin يستطيع حظر المشرفين", cannot_block_super_admin: "لا يمكن حظر Super Admin",
+  admin_has_listings: "لا يمكن حذف مشرف لديه إعلانات، أزل الإشراف عنه بدلاً من ذلك", cannot_delete_self: "لا يمكنك حذف حسابك",
+  not_an_admin: "هذا المستخدم ليس مشرفاً", duplicate_name: "الاسم مستخدم من قبل", name_required: "اكتب اسماً صحيحاً",
+  invalid_parent: "الموقع الأب غير صالح", region_has_children: "هذا الموقع يحتوي مناطق تابعة، لا يمكن جعله تابعاً لموقع آخر",
+  reason_required: "اكتب سبب الرفض", listing_not_published: "يمكن تمييز الإعلانات المنشورة فقط", invalid_recipients: "المستلمون غير صالحين",
+  nothing_to_retry: "لا توجد إشعارات فاشلة لإعادتها", not_scheduled: "الإشعار ليس مجدولاً", invalid_permission: "صلاحية غير معروفة",
+};
+const msg = (e) => ERR[e?.message] || e?.message || "حدث خطأ غير متوقع";
+const fmtDate = (d) => (d ? new Date(d).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" }) : "—");
+const fmtDay = (d) => (d ? new Date(d).toLocaleDateString("ar-EG") : "—");
+const fmtPrice = (n) => `${Number(n || 0).toLocaleString("ar-EG")} ج.م`;
+const ROLE = { super_admin: ["Super Admin", "bg-gold"], admin: ["مشرف", "bg-info"], user: ["مستخدم", ""] };
+const LSTATUS = { pending: ["قيد المراجعة", "bg-warn"], published: ["منشور", "bg-ok"], rejected: ["مرفوض", "bg-bad"] };
+const NSTATUS = { sent: ["تم الإرسال", "bg-ok"], partial: ["أُرسل جزئياً", "bg-warn"], failed: ["فشل", "bg-bad"], scheduled: ["مجدول", "bg-info"], cancelled: ["ملغي", ""] };
+const AUDIENCE = { all: "كل المستخدمين", user: "مستخدم محدد", selected: "مستخدمون محددون" };
+const ACTION = {
+  approve: "قبول إعلان", reject: "رفض إعلان", feature: "تمييز إعلان", unfeature: "إلغاء تمييز", delete_listing: "حذف إعلان",
+  block_user: "حظر مستخدم", unblock_user: "فك حظر", role_change: "تغيير دور", permissions_change: "تعديل صلاحيات", delete_admin: "حذف مشرف",
+  save_category: "حفظ تصنيف", save_region: "حفظ موقع", save_setting: "تعديل إعدادات", send_notification: "إرسال إشعار",
+  retry_notification: "إعادة إرسال إشعار", cancel_notification: "إلغاء إشعار", report_resolved: "إغلاق بلاغ", report_dismissed: "رفض بلاغ", report_open: "إعادة فتح بلاغ",
+};
+const KINDS = { none: "بدون تفاصيل", residential: "سكني", agri: "زراعي", building: "مبنى / عقار كامل" };
+
+const cls = (...a) => a.filter(Boolean).join(" ");
+const badge = (map, k) => { const [t, c] = map[k] || [k, ""]; return <span className={cls(styles.badge, c && styles[c])}>{t}</span>; };
+
+async function rpc(name, args) {
+  const { data, error } = await supabase.rpc(name, args);
+  if (error) throw error;
+  return data;
+}
+
+function useLoad(fn, deps) {
+  const [st, setSt] = useState({ data: null, error: "", loading: true });
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    let off = false;
+    setSt((s) => ({ ...s, loading: true }));
+    fn().then((data) => !off && setSt({ data, error: "", loading: false }))
+      .catch((e) => !off && setSt({ data: null, error: msg(e), loading: false }));
+    return () => { off = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [...deps, tick]);
+  return [st, useCallback(() => setTick((t) => t + 1), [])];
+}
+
+function useAccess(user) {
+  const [acc, setAcc] = useState(null);
+  useEffect(() => {
+    if (!user) return;
+    let off = false;
+    (async () => {
+      const { data: me } = await supabase.rpc("get_my_profile");
+      let perms = [];
+      if (me?.role === "admin") {
+        const { data } = await supabase.from("admin_permissions").select("perms").eq("user_id", me.id).maybeSingle();
+        perms = data?.perms || [];
+      }
+      if (!off) setAcc({ me, perms, isSuper: me?.role === "super_admin", isAdmin: me?.role === "admin" || me?.role === "super_admin" });
+    })();
+    return () => { off = true; };
+  }, [user]);
+  return acc;
+}
+
+/* ---------- small UI helpers ---------- */
+function Head({ title, sub, children }) {
+  return <div className={styles.pageHead}><div><h2>{title}</h2>{sub && <p>{sub}</p>}</div><div>{children}</div></div>;
+}
+function Pager({ total, offset, onGo }) {
+  const pages = Math.max(1, Math.ceil(total / LIMIT)); const cur = Math.floor(offset / LIMIT) + 1;
+  if (pages <= 1) return null;
+  return (
+    <div className={styles.pager}>
+      <button className={styles.b} disabled={cur <= 1} onClick={() => onGo(offset - LIMIT)}>السابق</button>
+      <span>{cur} / {pages}</span>
+      <button className={styles.b} disabled={cur >= pages} onClick={() => onGo(offset + LIMIT)}>التالي</button>
+    </div>
+  );
+}
+function State({ st, children }) {
+  if (st.loading && !st.data) return <div className={styles.skel} />;
+  if (st.error) return <p className={styles.err}>{st.error}</p>;
+  return children;
+}
+function Search({ onSearch, placeholder, children }) {
+  const [q, setQ] = useState("");
+  return (
+    <form className={styles.toolbar} onSubmit={(e) => { e.preventDefault(); onSearch(q.trim()); }}>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder} />
+      <button className={cls(styles.b, styles.bPrimary)}>بحث</button>
+      {children}
+    </form>
+  );
+}
+function Bars({ items }) {
+  const max = Math.max(1, ...items.map((i) => Number(i.value)));
+  return (
+    <div className={styles.bars}>
+      {items.map((i) => (
+        <div className={styles.bar} key={i.label}>
+          <span>{i.label}</span><i style={{ width: `${(Number(i.value) / max) * 100}%` }} /><span>{i.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+function Modal({ onClose, children }) {
+  return <div className={styles.modalBg} onClick={onClose}><div className={styles.modal} onClick={(e) => e.stopPropagation()}>{children}</div></div>;
+}
+const Denied = () => <div className={styles.page}><div className={styles.card}><h3>غير مصرح</h3><p>ليس لديك صلاحية الوصول لهذا القسم.</p></div></div>;
+
+/* ---------- page shell ---------- */
+export default function Page() { return <Suspense fallback={null}><Admin /></Suspense>; }
+
+function Admin() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const s = useSearchParams().get("s") || "overview";
+  const acc = useAccess(user);
+  const [flash, setFlash] = useState(null);
+  const toast = useCallback((text, kind = "ok") => { setFlash({ text, kind }); setTimeout(() => setFlash(null), 3500); }, []);
+
+  useEffect(() => { if (!loading && !user) router.push("/auth"); }, [user, loading]);
+  if (!user || !acc) return <div className={styles.page}><div className={styles.skel} /></div>;
+  if (!acc.isAdmin) return <Denied />;
+
+  const [g, sub] = s.split(".");
+  const can = (p) => acc.isSuper || acc.perms.includes(p);
+  const P = { acc, can, toast };
+  let view;
+  switch (g) {
+    case "overview": view = <Overview {...P} />; break;
+    case "users": view = can("users") ? <Users filter={sub || "all"} {...P} /> : <Denied />; break;
+    case "listings": view = can("listings") ? <Listings filter={sub || "all"} {...P} /> : <Denied />; break;
+    case "categories": view = can("categories") ? <Categories mode={sub || "all"} {...P} /> : <Denied />; break;
+    case "locations": view = can("locations") ? <Locations mode={sub || "all"} {...P} /> : <Denied />; break;
+    case "admins": view = acc.isSuper ? <Admins mode={sub || "list"} {...P} /> : <Denied />; break;
+    case "reports": view = can("reports") ? <Reports kind={sub || "all"} {...P} /> : <Denied />; break;
+    case "notifications":
+      view = !can("notifications") ? <Denied /> : sub === "send" ? <SendNotification {...P} /> : <NotificationList scope={sub || "all"} {...P} />; break;
+    case "analytics": view = <Analytics view={sub || "overview"} />; break;
+    case "settings": view = acc.isSuper ? <SettingsForm k={sub === "contact" ? "contact" : "general"} {...P} /> : <Denied />; break;
+    case "logs": view = acc.isSuper ? <Logs /> : <Denied />; break;
+    default: view = <Overview {...P} />;
+  }
+  return (
+    <div className={styles.page}>
+      {view}
+      {flash && <div className={cls(styles.toast, flash.kind === "err" ? styles.toastErr : styles.toastOk)}>{flash.text}</div>}
+    </div>
+  );
+}
+
+/* ====================== نظرة عامة + التحليلات ====================== */
+function Overview({ acc }) {
+  const [st] = useLoad(() => rpc("admin_get_stats"), []);
+  return (
+    <>
+      <Head title="نظرة عامة" sub={acc.isSuper ? "تحكم كامل في النظام" : "صلاحيات إدارية محدودة"} />
+      <State st={st}>
+        {st.data && (
+          <>
+            <div className={styles.tiles}>
+              <Tile label="المستخدمون" v={st.data.users.total} href="/dashboard/admin?s=users.all" />
+              <Tile label="إعلانات بانتظار الموافقة" v={st.data.listings.pending} href="/dashboard/admin?s=listings.pending" warn={st.data.listings.pending > 0} />
+              <Tile label="إعلانات منشورة" v={st.data.listings.published} href="/dashboard/admin?s=listings.published" />
+              <Tile label="بلاغات مفتوحة" v={st.data.reports_open} href="/dashboard/admin?s=reports.all" warn={st.data.reports_open > 0} />
+              <Tile label="إشعارات مجدولة" v={st.data.scheduled_notifications} href="/dashboard/admin?s=notifications.scheduled" />
+              <Tile label="مستخدمون محظورون" v={st.data.users.blocked} href="/dashboard/admin?s=users.blocked" />
+            </div>
+            <div className={styles.grid2}>
+              <div className={styles.card}><h3>مستخدمون جدد (آخر 6 أشهر)</h3><Bars items={st.data.users_by_month.map((m) => ({ label: m.month, value: m.count }))} /></div>
+              <div className={styles.card}><h3>إعلانات جديدة (آخر 6 أشهر)</h3><Bars items={st.data.listings_by_month.map((m) => ({ label: m.month, value: m.count }))} /></div>
+            </div>
+          </>
+        )}
+      </State>
+    </>
+  );
+}
+function Tile({ label, v, href, warn }) {
+  return <Link href={href} className={cls(styles.tile, warn && styles.tileWarn)}><small>{label}</small><b>{Number(v).toLocaleString("ar-EG")}</b></Link>;
+}
+
+function Analytics({ view }) {
+  const [st] = useLoad(() => rpc("admin_get_stats"), []);
+  const titles = { overview: "التحليلات · نظرة عامة", users: "إحصائيات المستخدمين", listings: "إحصائيات الإعلانات" };
+  const d = st.data;
+  return (
+    <>
+      <Head title={titles[view] || titles.overview} />
+      <State st={st}>
+        {d && view === "users" && (
+          <>
+            <div className={styles.tiles}>
+              <Tile label="إجمالي المستخدمين" v={d.users.total} href="/dashboard/admin?s=users.all" />
+              <Tile label="النشطون" v={d.users.active} href="/dashboard/admin?s=users.active" />
+              <Tile label="المحظورون" v={d.users.blocked} href="/dashboard/admin?s=users.blocked" />
+              <Tile label="المشرفون" v={d.users.admins} href="/dashboard/admin?s=users.admins" />
+              <Tile label="جدد آخر 30 يوم" v={d.users.new_30d} href="/dashboard/admin?s=users.all" />
+            </div>
+            <div className={styles.card}><h3>التسجيلات الشهرية</h3><Bars items={d.users_by_month.map((m) => ({ label: m.month, value: m.count }))} /></div>
+          </>
+        )}
+        {d && view === "listings" && (
+          <>
+            <div className={styles.tiles}>
+              <Tile label="كل الإعلانات" v={d.listings.total} href="/dashboard/admin?s=listings.all" />
+              <Tile label="منشورة" v={d.listings.published} href="/dashboard/admin?s=listings.published" />
+              <Tile label="قيد المراجعة" v={d.listings.pending} href="/dashboard/admin?s=listings.pending" />
+              <Tile label="مرفوضة" v={d.listings.rejected} href="/dashboard/admin?s=listings.rejected" />
+              <Tile label="مميزة" v={d.listings.featured} href="/dashboard/admin?s=listings.featured" />
+              <Tile label="مُبلَّغ عنها" v={d.listings.reported} href="/dashboard/admin?s=listings.reported" warn={d.listings.reported > 0} />
+            </div>
+            <div className={styles.grid2}>
+              <div className={styles.card}><h3>حسب التصنيف</h3><Bars items={d.by_category.map((x) => ({ label: x.name, value: x.count }))} /></div>
+              <div className={styles.card}><h3>أكثر المواقع إعلانات</h3><Bars items={d.by_region.map((x) => ({ label: x.name, value: x.count }))} /></div>
+            </div>
+            <div className={styles.card}><h3>الإعلانات الشهرية</h3><Bars items={d.listings_by_month.map((m) => ({ label: m.month, value: m.count }))} /></div>
+          </>
+        )}
+        {d && view !== "users" && view !== "listings" && (
+          <div className={styles.grid2}>
+            <div className={styles.card}><h3>المستخدمون</h3><Bars items={[{ label: "نشطون", value: d.users.active }, { label: "محظورون", value: d.users.blocked }, { label: "مشرفون", value: d.users.admins }]} /></div>
+            <div className={styles.card}><h3>الإعلانات</h3><Bars items={[{ label: "منشورة", value: d.listings.published }, { label: "قيد المراجعة", value: d.listings.pending }, { label: "مرفوضة", value: d.listings.rejected }, { label: "مميزة", value: d.listings.featured }]} /></div>
+          </div>
+        )}
+      </State>
+    </>
+  );
+}
+
+/* ====================== المستخدمون ====================== */
+function Users({ filter, acc, can, toast }) {
+  const [term, setTerm] = useState(""); const [off, setOff] = useState(0);
+  const [st, reload] = useLoad(() => rpc("admin_list_users", { p_search: term || null, p_filter: filter, p_limit: LIMIT, p_offset: off }), [term, off, filter]);
+  const run = async (fn, ok, confirmText) => {
+    if (confirmText && !confirm(confirmText)) return;
+    try { await fn(); toast(ok); reload(); } catch (e) { toast(msg(e), "err"); }
+  };
+  const titles = { all: "كل المستخدمين", active: "المستخدمون النشطون", blocked: "المستخدمون المحظورون", admins: "المشرفون" };
+  return (
+    <>
+      <Head title={titles[filter] || titles.all} sub={st.data ? `${st.data.total} حساب` : ""} />
+      <Search onSearch={(q) => { setOff(0); setTerm(q); }} placeholder="بحث بالاسم أو الإيميل أو الموبايل" />
+      <State st={st}>
+        <div className={styles.tw}>
+          <table className={styles.tbl}>
+            <thead><tr><th>المستخدم</th><th>الموبايل</th><th>الدور</th><th>الحالة</th><th>إعلانات</th><th>التسجيل</th><th>إجراءات</th></tr></thead>
+            <tbody>
+              {st.data?.items.map((u) => {
+                const self = u.id === acc.me.id;
+                const canBlock = can("users") && !self && u.role !== "super_admin" && (u.role === "user" || acc.isSuper);
+                return (
+                  <tr key={u.id}>
+                    <td><div className={styles.cell}><strong>{u.full_name || "—"}</strong><small>{u.email}</small></div></td>
+                    <td>{u.phone || "—"}</td>
+                    <td>{badge(ROLE, u.role)}</td>
+                    <td>{u.is_blocked ? <span className={cls(styles.badge, styles["bg-bad"])}>محظور</span> : <span className={cls(styles.badge, styles["bg-ok"])}>نشط</span>}</td>
+                    <td>{u.listings_count}</td>
+                    <td>{fmtDay(u.created_at)}</td>
+                    <td>
+                      <div className={styles.acts}>
+                        {canBlock && (
+                          <button className={cls(styles.b, u.is_blocked ? styles.bOk : styles.bDanger)}
+                            onClick={() => run(() => rpc("admin_set_user_blocked", { p_user_id: u.id, p_blocked: !u.is_blocked }), u.is_blocked ? "تم فك الحظر" : "تم الحظر", !u.is_blocked && "حظر هذا المستخدم؟")}>
+                            {u.is_blocked ? "فك الحظر" : "حظر"}
+                          </button>
+                        )}
+                        {acc.isSuper && !self && u.role === "user" && (
+                          <button className={styles.b} onClick={() => run(() => rpc("admin_set_user_role", { p_user_id: u.id, p_role: "admin" }), "تمت الترقية إلى مشرف", "ترقية هذا المستخدم إلى مشرف؟")}>ترقية إلى مشرف</button>
+                        )}
+                        {acc.isSuper && !self && u.role === "admin" && (
+                          <button className={styles.b} onClick={() => run(() => rpc("admin_set_user_role", { p_user_id: u.id, p_role: "user" }), "تم إلغاء الإشراف", "إلغاء صلاحيات الإشراف؟")}>إلغاء الإشراف</button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {st.data?.items.length === 0 && <p className={styles.empty}>لا توجد نتائج.</p>}
+        </div>
+        {st.data && <Pager total={st.data.total} offset={off} onGo={setOff} />}
+      </State>
+    </>
+  );
+}
+
+/* ====================== الإعلانات ====================== */
+function Listings({ filter, toast }) {
+  const [term, setTerm] = useState(""); const [off, setOff] = useState(0);
+  const [st, reload] = useLoad(() => rpc("admin_list_listings", { p_filter: filter, p_search: term || null, p_limit: LIMIT, p_offset: off }), [term, off, filter]);
+  const run = async (fn, ok, confirmText) => {
+    if (confirmText && !confirm(confirmText)) return;
+    try { await fn(); toast(ok); reload(); } catch (e) { toast(msg(e), "err"); }
+  };
+  const reject = (l) => {
+    const r = prompt("سبب الرفض (سيظهر للمعلن):");
+    if (r && r.trim()) run(() => rpc("admin_review_listing", { p_id: l.id, p_decision: "reject", p_reason: r }), "تم رفض الإعلان");
+  };
+  const del = (l) => run(async () => { const { error } = await supabase.from("listings").delete().eq("id", l.id); if (error) throw error; }, "تم حذف الإعلان", "حذف الإعلان نهائياً؟");
+  const titles = { all: "كل الإعلانات", pending: "بانتظار الموافقة", published: "الإعلانات المنشورة", rejected: "الإعلانات المرفوضة", featured: "الإعلانات المميزة", reported: "الإعلانات المُبلَّغ عنها" };
+  return (
+    <>
+      <Head title={titles[filter] || titles.all} sub={st.data ? `${st.data.total} إعلان` : ""} />
+      <Search onSearch={(q) => { setOff(0); setTerm(q); }} placeholder="بحث بعنوان الإعلان" />
+      <State st={st}>
+        <div className={styles.tw}>
+          <table className={styles.tbl}>
+            <thead><tr><th>الإعلان</th><th>المعلن</th><th>السعر</th><th>الحالة</th><th>بلاغات</th><th>التاريخ</th><th>إجراءات</th></tr></thead>
+            <tbody>
+              {st.data?.items.map((l) => (
+                <tr key={l.id}>
+                  <td>
+                    <div className={styles.row}>
+                      <div className={styles.thumb} style={{ background: l.cover_path ? `url(${l.cover_path}) center/cover` : undefined }} />
+                      <div className={styles.cell}>
+                        <Link href={`/listing/${l.id}`} target="_blank"><strong>{l.title}</strong></Link>
+                        <small>{l.category_name_ar} · {l.region_name_ar}</small>
+                        {l.status === "rejected" && l.rejection_reason && <small className={styles.err}>السبب: {l.rejection_reason}</small>}
+                      </div>
+                    </div>
+                  </td>
+                  <td>{l.owner_name}</td>
+                  <td>{fmtPrice(l.price)}</td>
+                  <td>{badge(LSTATUS, l.status)} {l.is_featured && <span className={cls(styles.badge, styles["bg-gold"])}>مميز</span>}</td>
+                  <td>{l.reports_count > 0 ? <span className={cls(styles.badge, styles["bg-bad"])}>{l.reports_count}</span> : "—"}</td>
+                  <td>{fmtDay(l.created_at)}</td>
+                  <td>
+                    <div className={styles.acts}>
+                      {l.status !== "published" && <button className={cls(styles.b, styles.bOk)} onClick={() => run(() => rpc("admin_review_listing", { p_id: l.id, p_decision: "approve" }), "تم نشر الإعلان")}>قبول</button>}
+                      {l.status !== "rejected" && <button className={cls(styles.b, styles.bDanger)} onClick={() => reject(l)}>رفض</button>}
+                      {l.status === "published" && <button className={styles.b} onClick={() => run(() => rpc("admin_set_featured", { p_id: l.id, p_featured: !l.is_featured }), l.is_featured ? "أُلغي التمييز" : "تم التمييز")}>{l.is_featured ? "إلغاء التمييز" : "تمييز"}</button>}
+                      <button className={cls(styles.b, styles.bDanger)} onClick={() => del(l)}>حذف</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {st.data?.items.length === 0 && <p className={styles.empty}>لا توجد إعلانات.</p>}
+        </div>
+        {st.data && <Pager total={st.data.total} offset={off} onGo={setOff} />}
+      </State>
+    </>
+  );
+}
+
+/* ====================== التصنيفات ====================== */
+function Categories({ mode, toast }) {
+  const [edit, setEdit] = useState(null);
+  const [st, reload] = useLoad(async () => {
+    const { data, error } = await supabase.from("categories").select("*").order("sort_order").order("id");
+    if (error) throw error; return data;
+  }, []);
+  const save = async (f, done) => {
+    try {
+      await rpc("admin_save_category", { p_id: f.id ?? null, p_name_ar: f.name_ar, p_details_kind: f.details_kind, p_sort: +f.sort_order || 0, p_active: f.is_active });
+      toast("تم الحفظ"); reload(); done?.();
+    } catch (e) { toast(msg(e), "err"); }
+  };
+  const form = (init, done) => <CategoryForm key={init.id ?? "new"} init={init} onSave={(f) => save(f, done)} onCancel={done} />;
+  return (
+    <>
+      <Head title={mode === "add" ? "إضافة تصنيف" : "كل التصنيفات"} sub="التصنيف المعطّل لا يظهر للمعلنين في نموذج الإضافة" />
+      {mode === "add" && <div className={styles.card}>{form({ name_ar: "", details_kind: "none", sort_order: 0, is_active: true })}</div>}
+      {mode !== "add" && (
+        <State st={st}>
+          {edit && <div className={styles.card}><h3>تعديل التصنيف</h3>{form(edit, () => setEdit(null))}</div>}
+          <div className={styles.tw}>
+            <table className={styles.tbl}>
+              <thead><tr><th>الاسم</th><th>النوع</th><th>الترتيب</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+              <tbody>
+                {st.data?.map((c) => (
+                  <tr key={c.id}>
+                    <td><strong>{c.name_ar}</strong></td><td>{KINDS[c.details_kind]}</td><td>{c.sort_order}</td>
+                    <td>{c.is_active ? <span className={cls(styles.badge, styles["bg-ok"])}>مفعّل</span> : <span className={styles.badge}>معطّل</span>}</td>
+                    <td><div className={styles.acts}>
+                      <button className={styles.b} onClick={() => setEdit(c)}>تعديل</button>
+                      <button className={cls(styles.b, c.is_active ? styles.bDanger : styles.bOk)} onClick={() => save({ ...c, is_active: !c.is_active })}>{c.is_active ? "تعطيل" : "تفعيل"}</button>
+                    </div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </State>
+      )}
+    </>
+  );
+}
+function CategoryForm({ init, onSave, onCancel }) {
+  const [f, setF] = useState(init); const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  return (
+    <form className={styles.form} onSubmit={(e) => { e.preventDefault(); onSave(f); if (!init.id) setF({ name_ar: "", details_kind: "none", sort_order: 0, is_active: true }); }}>
+      <div className={styles.field}><label>اسم التصنيف</label><input required minLength={2} className={styles.in} value={f.name_ar} onChange={set("name_ar")} /></div>
+      <div className={styles.two}>
+        <div className={styles.field}><label>نوع التفاصيل</label><select className={styles.in} value={f.details_kind} onChange={set("details_kind")}>{Object.entries(KINDS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
+        <div className={styles.field}><label>الترتيب</label><input type="number" className={styles.in} value={f.sort_order} onChange={set("sort_order")} /></div>
+      </div>
+      <div className={styles.checks}><label><input type="checkbox" checked={f.is_active} onChange={(e) => setF({ ...f, is_active: e.target.checked })} /> مفعّل</label></div>
+      <div className={styles.acts}>
+        <button className={cls(styles.b, styles.bPrimary)}>حفظ</button>
+        {onCancel && init.id && <button type="button" className={styles.b} onClick={onCancel}>إلغاء</button>}
+      </div>
+    </form>
+  );
+}
+
+/* ====================== المواقع ====================== */
+function Locations({ mode, toast }) {
+  const [edit, setEdit] = useState(null);
+  const [st, reload] = useLoad(async () => {
+    const { data, error } = await supabase.from("regions").select("*").order("sort_order").order("id");
+    if (error) throw error; return data;
+  }, []);
+  const byId = Object.fromEntries((st.data || []).map((r) => [r.id, r]));
+  const parents = (st.data || []).filter((r) => !r.parent_id);
+  const save = async (f, done) => {
+    try {
+      await rpc("admin_save_region", { p_id: f.id ?? null, p_name_ar: f.name_ar, p_parent_id: f.parent_id ? +f.parent_id : null, p_sort: +f.sort_order || 0, p_active: f.is_active });
+      toast("تم الحفظ"); reload(); done?.();
+    } catch (e) { toast(msg(e), "err"); }
+  };
+  const rows = (st.data || []).filter((r) => (mode === "villages" ? r.parent_id : true));
+  const form = (init, done) => <RegionForm key={init.id ?? "new"} init={init} parents={parents.filter((p) => p.id !== init.id)} onSave={(f) => save(f, done)} onCancel={done} />;
+  const titles = { all: "كل المواقع", add: "إضافة موقع جديد", villages: "القرى والمناطق" };
+  return (
+    <>
+      <Head title={titles[mode] || titles.all} sub="يمكن ربط القرية أو المنطقة بموقع رئيسي، وتعطيل أي موقع بدل حذفه" />
+      <State st={st}>
+        {mode === "add" && <div className={styles.card}>{form({ name_ar: "", parent_id: "", sort_order: 0, is_active: true })}</div>}
+        {mode !== "add" && (
+          <>
+            {edit && <div className={styles.card}><h3>تعديل الموقع</h3>{form({ ...edit, parent_id: edit.parent_id || "" }, () => setEdit(null))}</div>}
+            <div className={styles.tw}>
+              <table className={styles.tbl}>
+                <thead><tr><th>الموقع</th><th>تابع لـ</th><th>الترتيب</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.id}>
+                      <td><strong>{r.name_ar}</strong></td><td>{r.parent_id ? byId[r.parent_id]?.name_ar : "—"}</td><td>{r.sort_order}</td>
+                      <td>{r.is_active ? <span className={cls(styles.badge, styles["bg-ok"])}>مفعّل</span> : <span className={styles.badge}>معطّل</span>}</td>
+                      <td><div className={styles.acts}>
+                        <button className={styles.b} onClick={() => setEdit(r)}>تعديل</button>
+                        <button className={cls(styles.b, r.is_active ? styles.bDanger : styles.bOk)} onClick={() => save({ ...r, is_active: !r.is_active })}>{r.is_active ? "تعطيل" : "تفعيل"}</button>
+                      </div></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {rows.length === 0 && <p className={styles.empty}>لا توجد مواقع.</p>}
+            </div>
+          </>
+        )}
+      </State>
+    </>
+  );
+}
+function RegionForm({ init, parents, onSave, onCancel }) {
+  const blank = { name_ar: "", parent_id: "", sort_order: 0, is_active: true };
+  const [f, setF] = useState(init); const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  return (
+    <form className={styles.form} onSubmit={(e) => { e.preventDefault(); onSave(f); if (!init.id) setF(blank); }}>
+      <div className={styles.field}><label>اسم الموقع</label><input required minLength={2} className={styles.in} value={f.name_ar} onChange={set("name_ar")} /></div>
+      <div className={styles.two}>
+        <div className={styles.field}><label>الموقع الرئيسي (اختياري)</label>
+          <select className={styles.in} value={f.parent_id} onChange={set("parent_id")}><option value="">— موقع رئيسي —</option>{parents.map((p) => <option key={p.id} value={p.id}>{p.name_ar}</option>)}</select></div>
+        <div className={styles.field}><label>الترتيب</label><input type="number" className={styles.in} value={f.sort_order} onChange={set("sort_order")} /></div>
+      </div>
+      <div className={styles.checks}><label><input type="checkbox" checked={f.is_active} onChange={(e) => setF({ ...f, is_active: e.target.checked })} /> مفعّل</label></div>
+      <div className={styles.acts}>
+        <button className={cls(styles.b, styles.bPrimary)}>حفظ</button>
+        {onCancel && init.id && <button type="button" className={styles.b} onClick={onCancel}>إلغاء</button>}
+      </div>
+    </form>
+  );
+}
+
+/* ====================== المشرفون والصلاحيات (Super Admin فقط) ====================== */
+function Admins({ mode, acc, toast }) {
+  const [st, reload] = useLoad(() => rpc("admin_list_admins"), []);
+  const [email, setEmail] = useState("");
+  const run = async (fn, ok, confirmText) => {
+    if (confirmText && !confirm(confirmText)) return;
+    try { await fn(); toast(ok); reload(); } catch (e) { toast(msg(e), "err"); }
+  };
+  const add = (e) => { e.preventDefault(); run(async () => { await rpc("admin_add_admin_by_email", { p_email: email }); setEmail(""); }, "تمت إضافة المشرف"); };
+  const titles = { list: "كل المشرفين", add: "إضافة مشرف جديد", roles: "الأدوار والصلاحيات" };
+
+  return (
+    <>
+      <Head title={titles[mode] || titles.list} />
+      {mode === "add" && (
+        <div className={styles.card}>
+          <div className={styles.note}>أدخل بريد مستخدم مسجّل بالفعل لترقيته إلى «مشرف». الترقية إلى Super Admin غير متاحة من لوحة التحكم.</div>
+          <form className={styles.form} onSubmit={add}>
+            <div className={styles.field}><label>البريد الإلكتروني للمستخدم</label><input required type="email" className={styles.in} value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+            <div><button className={cls(styles.b, styles.bPrimary)}>ترقية إلى مشرف</button></div>
+          </form>
+        </div>
+      )}
+      {mode === "roles" && (
+        <div className={styles.card}>
+          <h3>مصفوفة الأدوار</h3>
+          <div className={styles.tw}><table className={styles.tbl}>
+            <thead><tr><th>الإجراء</th><th>Super Admin</th><th>مشرف</th></tr></thead>
+            <tbody>
+              {[["ترقية مستخدم ← مشرف", 1, 0], ["إلغاء الإشراف (مشرف ← مستخدم)", 1, 0], ["الترقية إلى Super Admin", 0, 0], ["خفض Super Admin ← مشرف (غير نفسه)", 1, 0],
+                ["حظر / فك حظر المستخدمين", 1, 1], ["حظر المشرفين", 1, 0], ["حذف حساب مشرف", 1, 0], ["إدارة صلاحيات المشرفين", 1, 0], ["الإعدادات وسجل النشاط", 1, 0]]
+                .map(([a, s, m]) => <tr key={a}><td>{a}</td><td>{s ? "✅" : "⛔"}</td><td>{m ? "✅" : "⛔"}</td></tr>)}
+            </tbody></table></div>
+          <p className={styles.empty}>لا يمكن إزالة أو خفض آخر Super Admin، ويُفرض ذلك داخل قاعدة البيانات.</p>
+        </div>
+      )}
+      <State st={st}>
+        {st.data && mode === "list" && (
+          <div className={styles.tw}><table className={styles.tbl}>
+            <thead><tr><th>المشرف</th><th>الدور</th><th>الحالة</th><th>الصلاحيات</th><th>إجراءات</th></tr></thead>
+            <tbody>
+              {st.data.map((a) => {
+                const self = a.id === acc.me.id;
+                return (
+                  <tr key={a.id}>
+                    <td><div className={styles.cell}><strong>{a.full_name || "—"}{self ? " (أنت)" : ""}</strong><small>{a.email}</small></div></td>
+                    <td>{badge(ROLE, a.role)}</td>
+                    <td>{a.is_blocked ? <span className={cls(styles.badge, styles["bg-bad"])}>محظور</span> : <span className={cls(styles.badge, styles["bg-ok"])}>نشط</span>}</td>
+                    <td>{a.role === "super_admin" ? "كاملة" : `${a.perms.length} من ${Object.keys(PERMS).length}`}</td>
+                    <td><div className={styles.acts}>
+                      {!self && a.role === "admin" && <>
+                        <button className={styles.b} onClick={() => run(() => rpc("admin_set_user_role", { p_user_id: a.id, p_role: "user" }), "تم إلغاء الإشراف", "إلغاء صلاحيات الإشراف؟")}>إلغاء الإشراف</button>
+                        <button className={cls(styles.b, styles.bDanger)} onClick={() => run(() => rpc("super_admin_delete_admin", { p_user_id: a.id }), "تم حذف المشرف", "حذف حساب هذا المشرف نهائياً؟")}>حذف الحساب</button>
+                      </>}
+                      {!self && a.role === "super_admin" && <button className={styles.b} onClick={() => run(() => rpc("admin_set_user_role", { p_user_id: a.id, p_role: "admin" }), "تم الخفض إلى مشرف", "خفض هذا الـ Super Admin إلى مشرف؟")}>خفض إلى مشرف</button>}
+                    </div></td>
+                  </tr>
+                );
+              })}
+            </tbody></table></div>
+        )}
+        {st.data && mode === "roles" && st.data.filter((a) => a.role === "admin").map((a) => <PermEditor key={a.id} admin={a} onSaved={reload} toast={toast} />)}
+        {st.data && mode === "roles" && st.data.every((a) => a.role !== "admin") && <p className={styles.empty}>لا يوجد مشرفون عاديون بعد.</p>}
+      </State>
+    </>
+  );
+}
+function PermEditor({ admin, onSaved, toast }) {
+  const [perms, setPerms] = useState(admin.perms);
+  const toggle = (k) => setPerms(perms.includes(k) ? perms.filter((x) => x !== k) : [...perms, k]);
+  const save = async () => { try { await rpc("admin_set_permissions", { p_user_id: admin.id, p_perms: perms }); toast("تم حفظ الصلاحيات"); onSaved(); } catch (e) { toast(msg(e), "err"); } };
+  return (
+    <div className={styles.card}>
+      <h3>{admin.full_name || admin.email} <small>· {admin.email}</small></h3>
+      <div className={styles.checks}>
+        {Object.entries(PERMS).map(([k, label]) => <label key={k}><input type="checkbox" checked={perms.includes(k)} onChange={() => toggle(k)} /> {label}</label>)}
+      </div>
+      <div className={styles.acts} style={{ marginTop: ".8rem" }}><button className={cls(styles.b, styles.bPrimary)} onClick={save}>حفظ الصلاحيات</button></div>
+    </div>
+  );
+}
+
+/* ====================== البلاغات ====================== */
+function Reports({ kind, can, toast }) {
+  const [status, setStatus] = useState("open"); const [off, setOff] = useState(0);
+  const [st, reload] = useLoad(() => rpc("admin_list_reports", { p_kind: kind === "all" ? null : kind, p_status: status || null, p_limit: LIMIT, p_offset: off }), [kind, status, off]);
+  const run = async (fn, ok, confirmText) => {
+    if (confirmText && !confirm(confirmText)) return;
+    try { await fn(); toast(ok); reload(); } catch (e) { toast(msg(e), "err"); }
+  };
+  const close = (r, s) => { const note = s === "open" ? "" : prompt("ملاحظة (اختياري):") ?? ""; run(() => rpc("admin_resolve_report", { p_id: r.id, p_status: s, p_note: note }), "تم التحديث"); };
+  const titles = { all: "كل البلاغات", listing: "بلاغات الإعلانات", user: "بلاغات المستخدمين" };
+  return (
+    <>
+      <Head title={titles[kind] || titles.all} sub={st.data ? `${st.data.total} بلاغ` : ""} />
+      <div className={styles.toolbar}>
+        <select value={status} onChange={(e) => { setOff(0); setStatus(e.target.value); }}>
+          <option value="open">مفتوحة</option><option value="resolved">تمت المعالجة</option><option value="dismissed">مرفوضة</option><option value="">الكل</option>
+        </select>
+      </div>
+      <State st={st}>
+        <div className={styles.tw}><table className={styles.tbl}>
+          <thead><tr><th>البلاغ</th><th>المُبلِّغ</th><th>الهدف</th><th>الحالة</th><th>التاريخ</th><th>إجراءات</th></tr></thead>
+          <tbody>
+            {st.data?.items.map((r) => (
+              <tr key={r.id}>
+                <td><div className={styles.cell}><strong>{r.reason}</strong>{r.details && <small>{r.details}</small>}{r.resolution_note && <small>ملاحظة: {r.resolution_note}</small>}</div></td>
+                <td>{r.reporter_name || "—"}</td>
+                <td>{r.kind === "listing" ? <Link href={`/listing/${r.listing_id}`} target="_blank">{r.listing_title || "إعلان محذوف"}</Link> : r.target_name || "—"}</td>
+                <td>{badge({ open: ["مفتوح", "bg-warn"], resolved: ["تمت المعالجة", "bg-ok"], dismissed: ["مرفوض", ""] }, r.status)}</td>
+                <td>{fmtDay(r.created_at)}</td>
+                <td><div className={styles.acts}>
+                  {r.status === "open" ? <>
+                    <button className={cls(styles.b, styles.bOk)} onClick={() => close(r, "resolved")}>تمت المعالجة</button>
+                    <button className={styles.b} onClick={() => close(r, "dismissed")}>رفض</button>
+                  </> : <button className={styles.b} onClick={() => close(r, "open")}>إعادة فتح</button>}
+                  {r.kind === "user" && can("users") && r.target_user_id && r.status === "open" &&
+                    <button className={cls(styles.b, styles.bDanger)} onClick={() => run(() => rpc("admin_set_user_blocked", { p_user_id: r.target_user_id, p_blocked: true }), "تم حظر المستخدم", "حظر المستخدم المُبلَّغ عنه؟")}>حظر</button>}
+                </div></td>
+              </tr>
+            ))}
+          </tbody></table>
+          {st.data?.items.length === 0 && <p className={styles.empty}>لا توجد بلاغات.</p>}
+        </div>
+        {st.data && <Pager total={st.data.total} offset={off} onGo={setOff} />}
+      </State>
+    </>
+  );
+}
+
+/* ====================== الإشعارات ====================== */
+function SendNotification({ toast }) {
+  const [aud, setAud] = useState("all"); const [picked, setPicked] = useState([]);
+  const [q, setQ] = useState(""); const [res, setRes] = useState([]);
+  const [title, setTitle] = useState(""); const [body, setBody] = useState("");
+  const [when, setWhen] = useState("now"); const [at, setAt] = useState(""); const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (aud === "all" || q.trim().length < 2) { setRes([]); return; }
+    const t = setTimeout(() => rpc("admin_list_users", { p_search: q.trim(), p_filter: "all", p_limit: 8, p_offset: 0 }).then((d) => setRes(d.items)).catch(() => {}), 300);
+    return () => clearTimeout(t);
+  }, [q, aud]);
+
+  const changeAud = (a) => { setAud(a); setPicked([]); setQ(""); setRes([]); };
+  const pick = (u) => setPicked(aud === "user" ? [u] : picked.some((p) => p.id === u.id) ? picked : [...picked, u]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (aud !== "all" && picked.length === 0) return toast("اختر المستلمين أولاً", "err");
+    if (when === "later" && (!at || new Date(at) <= new Date())) return toast("اختر موعداً مستقبلياً", "err");
+    if (aud === "all" && !confirm("سيصل الإشعار لكل المستخدمين. متابعة؟")) return;
+    setBusy(true);
+    try {
+      await rpc("admin_send_notification", {
+        p_title: title, p_body: body, p_audience: aud, p_user_ids: aud === "all" ? null : picked.map((p) => p.id),
+        p_scheduled_at: when === "later" ? new Date(at).toISOString() : null,
+      });
+      toast(when === "later" ? "تمت جدولة الإشعار" : "تم إرسال الإشعار");
+      setTitle(""); setBody(""); setPicked([]); setWhen("now"); setAt("");
+    } catch (x) { toast(msg(x), "err"); } finally { setBusy(false); }
+  };
+
+  return (
+    <>
+      <Head title="إرسال إشعار" />
+      <div className={styles.grid2}>
+        <form className={cls(styles.card, styles.form)} onSubmit={submit} style={{ maxWidth: "none" }}>
+          <div className={styles.field}><label>إرسال إلى</label>
+            <div className={styles.seg}>{Object.entries(AUDIENCE).map(([k, v]) => <button type="button" key={k} className={aud === k ? styles.active : ""} onClick={() => changeAud(k)}>{v}</button>)}</div></div>
+
+          {aud !== "all" && (
+            <div className={styles.field}>
+              <label>{aud === "user" ? "ابحث عن المستخدم" : "ابحث وأضف مستخدمين (حتى 500)"}</label>
+              <input className={styles.in} value={q} onChange={(e) => setQ(e.target.value)} placeholder="الاسم أو الإيميل أو الموبايل" />
+              {res.length > 0 && <div className={styles.picks}>{res.map((u) => <button type="button" className={styles.pick} key={u.id} onClick={() => pick(u)}><span>{u.full_name || "—"}</span><small>{u.email}</small></button>)}</div>}
+              {picked.length > 0 && <div className={styles.chips}>{picked.map((u) => <span className={styles.chip} key={u.id}>{u.full_name || u.email}<button type="button" onClick={() => setPicked(picked.filter((p) => p.id !== u.id))}>✕</button></span>)}</div>}
+            </div>
+          )}
+
+          <div className={styles.field}><label>عنوان الإشعار</label><input required minLength={2} maxLength={120} className={styles.in} value={title} onChange={(e) => setTitle(e.target.value)} /></div>
+          <div className={styles.field}><label>نص الإشعار</label><textarea required minLength={2} maxLength={1000} className={styles.in} value={body} onChange={(e) => setBody(e.target.value)} placeholder="عقارات جديدة متاحة الآن!" /></div>
+
+          <div className={styles.field}><label>وقت الإرسال</label>
+            <div className={styles.seg}>
+              <button type="button" className={when === "now" ? styles.active : ""} onClick={() => setWhen("now")}>إرسال فوراً</button>
+              <button type="button" className={when === "later" ? styles.active : ""} onClick={() => setWhen("later")}>جدولة لوقت لاحق</button>
+            </div>
+            {when === "later" && <input type="datetime-local" className={styles.in} value={at} onChange={(e) => setAt(e.target.value)} />}
+          </div>
+          <div><button className={cls(styles.b, styles.bPrimary)} disabled={busy}>{busy ? "جارٍ الإرسال..." : when === "later" ? "جدولة الإشعار" : "إرسال الإشعار"}</button></div>
+        </form>
+
+        <div className={styles.preview}>
+          <div className={styles.pc}><Bell size={20} /><div><strong>{title || "عنوان الإشعار"}</strong><div>{body || "نص الإشعار يظهر هنا"}</div></div></div>
+          <small>معاينة للتصميم فقط — لا تُرسل أي إشعار.</small>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function NotificationList({ scope, toast }) {
+  const [off, setOff] = useState(0); const [detail, setDetail] = useState(null);
+  const sc = scope === "scheduled" ? "scheduled" : scope === "history" ? "history" : "all";
+  const [st, reload] = useLoad(() => rpc("admin_list_notifications", { p_scope: sc, p_limit: LIMIT, p_offset: off }), [sc, off]);
+  const run = async (fn, ok, confirmText) => {
+    if (confirmText && !confirm(confirmText)) return;
+    try { await fn(); toast(ok); reload(); } catch (e) { toast(msg(e), "err"); }
+  };
+  const open = async (n) => { try { setDetail(await rpc("admin_get_notification", { p_id: n.id })); } catch (e) { toast(msg(e), "err"); } };
+  const titles = { all: "كل الإشعارات", history: "سجل الإشعارات", scheduled: "الإشعارات المجدولة" };
+  return (
+    <>
+      <Head title={titles[sc]} sub={st.data ? `${st.data.total} إشعار` : ""}>
+        <Link className={cls(styles.b, styles.bPrimary)} href="/dashboard/admin?s=notifications.send">إشعار جديد</Link>
+      </Head>
+      <State st={st}>
+        <div className={styles.tw}><table className={styles.tbl}>
+          <thead><tr><th>الإشعار</th><th>المستلمون</th><th>الحالة</th><th>التوصيل</th><th>الموعد</th><th>إجراءات</th></tr></thead>
+          <tbody>
+            {st.data?.items.map((n) => (
+              <tr key={n.id}>
+                <td><div className={styles.cell}><strong>{n.title}</strong><small>{n.body.length > 70 ? `${n.body.slice(0, 70)}…` : n.body}</small></div></td>
+                <td>{AUDIENCE[n.audience]} <small>({n.recipients_count})</small></td>
+                <td>{badge(NSTATUS, n.status)}</td>
+                <td>{n.status === "scheduled" || n.status === "cancelled" ? "—" : <>✅ {n.sent_count} {n.failed_count > 0 && <span className={styles.err}>· ❌ {n.failed_count}</span>}</>}</td>
+                <td>{fmtDate(n.status === "scheduled" ? n.scheduled_at : n.sent_at || n.created_at)}</td>
+                <td><div className={styles.acts}>
+                  <button className={styles.b} onClick={() => open(n)}>التفاصيل</button>
+                  {(n.status === "failed" || n.status === "partial") && <button className={cls(styles.b, styles.bOk)} onClick={() => run(() => rpc("admin_retry_notification", { p_id: n.id }), "تمت إعادة المحاولة")}>إعادة المحاولة</button>}
+                  {n.status === "scheduled" && <button className={cls(styles.b, styles.bDanger)} onClick={() => run(() => rpc("admin_cancel_notification", { p_id: n.id }), "تم إلغاء الجدولة", "إلغاء هذا الإشعار المجدول؟")}>إلغاء</button>}
+                </div></td>
+              </tr>
+            ))}
+          </tbody></table>
+          {st.data?.items.length === 0 && <p className={styles.empty}>لا توجد إشعارات.</p>}
+        </div>
+        {st.data && <Pager total={st.data.total} offset={off} onGo={setOff} />}
+      </State>
+      {detail && (
+        <Modal onClose={() => setDetail(null)}>
+          <h3>{detail.title}</h3>
+          <p>{detail.body}</p>
+          <p>{badge(NSTATUS, detail.status)} · {AUDIENCE[detail.audience]} · أنشئ {fmtDate(detail.created_at)}</p>
+          <div className={styles.tw}><table className={styles.tbl}>
+            <thead><tr><th>المستلم</th><th>الحالة</th><th>ملاحظة</th></tr></thead>
+            <tbody>{detail.recipients.map((r) => (
+              <tr key={r.user_id}>
+                <td><div className={styles.cell}><strong>{r.name || "—"}</strong><small>{r.email}</small></div></td>
+                <td>{r.status === "sent" ? "✅ تم" : r.status === "failed" ? "❌ فشل" : "⏳ بانتظار"}</td>
+                <td>{r.error === "user_blocked" ? "المستخدم محظور" : r.read_at ? "تمت القراءة" : "—"}</td>
+              </tr>))}</tbody></table></div>
+          <div className={styles.acts} style={{ marginTop: ".8rem" }}><button className={styles.b} onClick={() => setDetail(null)}>إغلاق</button></div>
+        </Modal>
+      )}
+    </>
+  );
+}
+
+/* ====================== الإعدادات (Super Admin) ====================== */
+const SETTING_FIELDS = {
+  general: { title: "الإعدادات العامة", fields: [["site_name", "اسم الموقع"], ["tagline", "وصف قصير"]] },
+  contact: { title: "بيانات التواصل", fields: [["phone", "رقم الهاتف"], ["whatsapp", "واتساب"], ["email", "البريد الإلكتروني"], ["address", "العنوان"]] },
+};
+function SettingsForm({ k, toast }) {
+  const cfg = SETTING_FIELDS[k];
+  const [st] = useLoad(async () => {
+    const { data, error } = await supabase.from("site_settings").select("value").eq("key", k).maybeSingle();
+    if (error) throw error; return data?.value || {};
+  }, [k]);
+  return <><Head title={cfg.title} /><State st={st}>{st.data && <SettingsBody key={k} k={k} cfg={cfg} init={st.data} toast={toast} />}</State></>;
+}
+function SettingsBody({ k, cfg, init, toast }) {
+  const [f, setF] = useState(init); const [busy, setBusy] = useState(false);
+  const save = async (e) => {
+    e.preventDefault(); setBusy(true);
+    try { await rpc("admin_save_setting", { p_key: k, p_value: f }); toast("تم حفظ الإعدادات"); } catch (x) { toast(msg(x), "err"); } finally { setBusy(false); }
+  };
+  return (
+    <form className={cls(styles.card, styles.form)} onSubmit={save}>
+      {cfg.fields.map(([key, label]) => <div className={styles.field} key={key}><label>{label}</label><input className={styles.in} value={f[key] || ""} onChange={(e) => setF({ ...f, [key]: e.target.value })} /></div>)}
+      <div><button className={cls(styles.b, styles.bPrimary)} disabled={busy}>{busy ? "جارٍ الحفظ..." : "حفظ"}</button></div>
+    </form>
+  );
+}
+
+/* ====================== سجل النشاط (Super Admin) ====================== */
+function Logs() {
+  const [off, setOff] = useState(0);
+  const [st] = useLoad(() => rpc("admin_list_logs", { p_limit: LIMIT, p_offset: off }), [off]);
+  return (
+    <>
+      <Head title="سجل النشاط" sub="كل الإجراءات الإدارية على النظام" />
+      <State st={st}>
+        <div className={styles.tw}><table className={styles.tbl}>
+          <thead><tr><th>الوقت</th><th>المنفِّذ</th><th>الإجراء</th><th>تفاصيل</th></tr></thead>
+          <tbody>
+            {st.data?.items.map((l, i) => (
+              <tr key={i}>
+                <td>{fmtDate(l.created_at)}</td><td>{l.actor_name || "—"}</td><td>{ACTION[l.action] || l.action}</td>
+                <td><small>{l.details?.note || (l.details?.to ? `${l.details.from} ← ${l.details.to}` : l.details?.name || l.details?.audience || "")}</small></td>
+              </tr>
+            ))}
+          </tbody></table>
+          {st.data?.items.length === 0 && <p className={styles.empty}>لا يوجد نشاط مسجّل.</p>}
+        </div>
+        {st.data && <Pager total={st.data.total} offset={off} onGo={setOff} />}
+      </State>
+    </>
+  );
+}
