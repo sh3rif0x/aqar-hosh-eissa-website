@@ -39,7 +39,7 @@ function Dashboard() {
     <section className="section" style={{ minHeight: "70vh" }}><div className="container">
       <header className="sec-head">
         <h2>لوحة المعلن</h2>
-        <Link href="/dashboard/new" className="btn"><Plus size={15} /> إعلان جديد</Link>
+        <Link href="/add-listing" className="btn"><Plus size={15} /> إعلان جديد</Link>
       </header>
 
       <div className="acct">

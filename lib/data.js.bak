@@ -1,0 +1,62 @@
+export const NAV_LINKS = [
+  { label: "الرئيسية", href: "/" },
+  { label: "جميع العقارات", href: "/browse" },
+  { label: "تجاري", href: "/commercial" },
+  { label: "للبيع", href: "/browse?deal=sale" },
+  { label: "للإيجار", href: "/browse?deal=rent" },
+  { label: "اتصل بنا", href: "/contact" },
+];
+export const HERO_SLIDES = [
+  "linear-gradient(120deg,#3b2410 0%,#8a5420 45%,#c98a43 100%)",
+  "linear-gradient(120deg,#2b1c10 0%,#6e4318 50%,#b9792f 100%)",
+  "linear-gradient(120deg,#33210f 0%,#7d4b1c 50%,#d19a58 100%)",
+];
+export const HERO_BADGES = ["نشر مجاني", "تواصل مباشر مع المالك", "حوش عيسى والمناطق المحيطة"];
+export const REGIONS = ["كل المناطق", "حوش عيسى", "أبو حمص", "كفر الدوار", "دمنهور", "إيتاي البارود", "المحمودية"];
+export const PROPERTY_TYPES = ["كل الأنواع", "شقة", "فيلا", "محل", "مبنى", "أرض زراعية", "أرض بناء"];
+export const CATEGORIES = [
+  { key: "apartment", label: "شقة", icon: "building" },
+  { key: "villa", label: "فيلا", icon: "home" },
+  { key: "shop", label: "محل", icon: "store" },
+  { key: "building", label: "مبنى", icon: "town" },
+  { key: "farm", label: "أرض زراعية", icon: "land" },
+  { key: "land", label: "أرض بناء", icon: "land" },
+];
+const OWNER = { name: "مالك", role: "مالك" };
+const AGENT = { name: "سمسار", role: "وكيل" };
+export const BUY = [
+  { id: 1, badge: "للبيع", price: "1,250,000 ج.م", title: "شقة 3 غرف في حوش عيسى بالقرب من الميدان", beds: 3, baths: 2, area: 150, type: "شقة", location: "حوش عيسى، البحيرة", listed: "منذ يومين", photos: 6, tone: 0, agent: OWNER },
+  { id: 2, badge: "للبيع", price: "3,800,000 ج.م", title: "فيلا مستقلة بحديقة على طريق رئيسي", beds: 4, baths: 3, area: 320, type: "فيلا", location: "حوش عيسى، البحيرة", listed: "منذ 3 أيام", photos: 8, tone: 1, agent: AGENT },
+  { id: 3, badge: "للبيع", price: "9,500,000 ج.م", title: "فدان أرض زراعية بسقي مضمون", beds: 0, baths: 0, area: 4200, type: "أرض زراعية", location: "أبو حمص، البحيرة", listed: "منذ 5 أيام", photos: 4, tone: 2, agent: OWNER },
+  { id: 4, badge: "للبيع", price: "2,100,000 ج.م", title: "قطعة أرض بناء 300 متر ناصية", beds: 0, baths: 0, area: 300, type: "أرض بناء", location: "حوش عيسى، البحيرة", listed: "منذ أسبوع", photos: 3, tone: 3, agent: AGENT },
+  { id: 5, badge: "للبيع", price: "1,750,000 ج.م", title: "محل تجاري على الشارع الرئيسي", beds: 0, baths: 1, area: 60, type: "محل", location: "حوش عيسى، البحيرة", listed: "منذ أسبوع", photos: 5, tone: 0, agent: OWNER },
+  { id: 6, badge: "للبيع", price: "6,200,000 ج.م", title: "مبنى سكني 4 أدوار على الرخصة", beds: 8, baths: 8, area: 400, type: "مبنى", location: "كفر الدوار، البحيرة", listed: "منذ 10 أيام", photos: 7, tone: 1, agent: AGENT },
+];
+export const RENT = [
+  { id: 11, badge: "للإيجار", price: "3,500 ج.م", period: "/شهر", title: "شقة غرفتين للإيجار قانون جديد", beds: 2, baths: 1, area: 110, type: "شقة", location: "حوش عيسى، البحيرة", listed: "منذ يومين", photos: 5, tone: 2, agent: OWNER },
+  { id: 12, badge: "للإيجار", price: "8,000 ج.م", period: "/شهر", title: "محل للإيجار بموقع تجاري مميز", beds: 0, baths: 1, area: 45, type: "محل", location: "حوش عيسى، البحيرة", listed: "منذ 4 أيام", photos: 4, tone: 3, agent: OWNER },
+  { id: 13, badge: "للإيجار", price: "12,000 ج.م", period: "/شهر", title: "فيلا للإيجار مفروشة", beds: 4, baths: 3, area: 280, type: "فيلا", location: "دمنهور، البحيرة", listed: "منذ 6 أيام", photos: 9, tone: 0, agent: AGENT },
+];
+export const NEWEST = [BUY[0], RENT[0], BUY[2], RENT[1], BUY[3], BUY[1]].map((p) => ({ ...p, id: p.id + 100 }));
+export const TRUST = [
+  { icon: "pin", title: "خبرة محلية", text: "عقارات حقيقية من حوش عيسى والمناطق المحيطة بها." },
+  { icon: "users", title: "تواصل مباشر", text: "تحدث مع المالك أو السمسار مباشرة بدون رسوم خفية." },
+  { icon: "heart", title: "بساطة وشفافية", text: "إعلانات واضحة وأسعار صادقة وتجربة سهلة." },
+];
+export const STEPS = [
+  { icon: "search", title: "ابحث", text: "اختر نوع العقار والمنطقة والسعر المناسب لك." },
+  { icon: "users", title: "تواصل", text: "اتصل أو راسل صاحب الإعلان عبر الهاتف أو واتساب." },
+  { icon: "check", title: "أتمم الصفقة", text: "عاين العقار واتفق على الشروط بكل وضوح." },
+];
+export const FAQ = [
+  { q: "ما المناطق التي يغطيها التطبيق؟", a: "حوش عيسى والمناطق المحيطة بها في محافظة البحيرة." },
+  { q: "هل نشر الإعلان مجاني؟", a: "نعم، نشر الإعلانات مجاني." },
+  { q: "ما أنواع العقارات المتاحة؟", a: "شقق وفلل ومحلات ومبانٍ وأراضٍ زراعية وأراضي بناء للبيع والإيجار." },
+  { q: "كيف أتواصل مع صاحب الإعلان؟", a: "عبر الاتصال المباشر أو الرسائل أو واتساب من صفحة الإعلان." },
+  { q: "هل تتم مراجعة الإعلانات؟", a: "نعم، تتم مراجعة الإعلانات من الإدارة قبل نشرها." },
+];
+export const FOOTER_COLUMNS = [
+  { title: "الموقع", links: ["الرئيسية", "جميع العقارات", "للبيع", "للإيجار"] },
+  { title: "العقارات", links: ["شقق", "فلل", "محلات", "أراضي"] },
+  { title: "الدعم", links: ["اتصل بنا", "الأسئلة الشائعة", "الشروط والأحكام", "سياسة الخصوصية"] },
+];

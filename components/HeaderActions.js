@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Bell, User, ChevronDown, UserCog, LayoutDashboard, ShieldCheck, LogOut } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
+import AccountTypeGate from "./AccountTypeGate";
 import styles from "./HeaderActions.module.css";
 
 /* يغلق القائمة عند الضغط خارجها أو بزر Esc */
@@ -100,7 +101,10 @@ export function UserMenu() {
 
   useEffect(() => {
     if (!user) { setMe(null); return; }
-    supabase.rpc("get_my_profile").then(({ data }) => setMe(data));
+    const load = () => supabase.rpc("get_my_profile").then(({ data }) => setMe(data));
+    load();
+    window.addEventListener("profile-updated", load);
+    return () => window.removeEventListener("profile-updated", load);
   }, [user]);
 
   if (!user) return null;
@@ -123,7 +127,7 @@ export function UserMenu() {
           </div>
           <Link href="/profile" onClick={() => setOpen(false)} role="menuitem"><UserCog size={16} /> الحساب الشخصي</Link>
           {isAdmin && <Link href="/dashboard/admin" onClick={() => setOpen(false)} role="menuitem"><ShieldCheck size={16} /> لوحة الإدارة</Link>}
-          {(isAdmin || me?.account_type === "owner") && (
+          {(isAdmin || me?.account_type === "owner" || me?.account_type === "broker") && (
             <Link href="/dashboard" onClick={() => setOpen(false)} role="menuitem"><LayoutDashboard size={16} /> لوحة المعلن</Link>
           )}
           <button onClick={logout} role="menuitem" className={styles.out}><LogOut size={16} /> تسجيل الخروج</button>
@@ -139,6 +143,7 @@ export default function HeaderActions() {
     <div className={styles.row}>
       <NotificationBell />
       <UserMenu />
+      <AccountTypeGate />
     </div>
   );
 }

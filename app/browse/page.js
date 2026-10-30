@@ -139,7 +139,7 @@ function Browse() {
     </aside>
   );
 
-  const title = g("deal") === "rent" ? "عقارات للإيجار" : g("deal") === "sale" ? "عقارات للبيع" : "تصفح العقارات";
+  const title = g("deal") === "rent" ? "عقارات للإيجار" : g("deal") === "sale" ? "عقارات للبيع" : "جميع العقارات";
 
   return (
     <section className="section" style={{ minHeight: "70vh" }}>

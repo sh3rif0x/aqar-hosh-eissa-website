@@ -1,0 +1,213 @@
+"use client";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/AuthContext";
+import "leaflet/dist/leaflet.css";
+import s from "./add.module.css";
+
+const FEATURES = [["gas","غاز"],["water","مياه"],["electricity","كهرباء"],["wifi","واي فاي"],["elevator","أسانسير"],["parking","جراج"]];
+const DURATIONS = [30, 60, 90, 180, 365];
+const FINISH = [["unfinished","على الطوب"],["semi_finished","نصف تشطيب"],["fully_finished","تشطيب كامل"],["super_lux","سوبر لوكس"]];
+const FURN = [["furnished","مفروش"],["semi_furnished","نصف مفروش"],["unfurnished","بدون فرش"]];
+const UNITS = [["sqm","م²"],["feddan","فدان"],["qirat","قيراط"],["sahm","سهم"]];
+
+function normPhone(v) {
+  let d = (v || "").replace(/\D/g, "");
+  if (d.startsWith("0020")) d = d.slice(4);
+  else if (d.startsWith("20")) d = d.slice(2);
+  if (d.startsWith("0")) d = d.slice(1);
+  return /^1[0125]\d{8}$/.test(d) ? "0" + d : null;
+}
+
+export default function AddListing() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const [cats, setCats] = useState([]);
+  const [regions, setRegions] = useState([]);
+  const [allowed, setAllowed] = useState(null);
+  const [f, setF] = useState({
+    deal_type: "sale", group: "residential", category_id: "", title: "", price: "", area: "", area_unit: "sqm",
+    rooms: "", bathrooms: "", floor: "", finishing: "", furnishing: "", features: [], region_id: "",
+    lat: null, lng: null, description: "", phone: "", duration_days: 30,
+  });
+  const [files, setFiles] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const mapEl = useRef(null), mapRef = useRef(null), markerRef = useRef(null);
+  const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
+
+  useEffect(() => {
+    supabase.from("categories").select("id,slug,name_ar,details_kind,group_kind").eq("is_active", true).order("sort_order").then(({ data }) => setCats(data || []));
+    supabase.from("regions").select("id,name_ar").eq("is_active", true).order("sort_order").then(({ data }) => setRegions(data || []));
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.rpc("get_my_profile").then(({ data }) => {
+      setAllowed(true);
+      if (data?.phone) setF((x) => ({ ...x, phone: x.phone || data.phone }));
+    });
+  }, [user]);
+
+  useEffect(() => {
+    if (!allowed) return;
+    let dead = false;
+    (async () => {
+      const L = (await import("leaflet")).default;
+      if (dead || !mapEl.current || mapRef.current) return;
+      const m = L.map(mapEl.current).setView([30.9, 30.2], 9);
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(m);
+      m.on("click", (e) => {
+        const { lat, lng } = e.latlng;
+        if (markerRef.current) markerRef.current.setLatLng(e.latlng);
+        else markerRef.current = L.circleMarker(e.latlng, { radius: 9, color: "#b8731f", fillOpacity: 0.8 }).addTo(m);
+        setF((x) => ({ ...x, lat, lng }));
+      });
+      mapRef.current = m;
+    })();
+    return () => { dead = true; mapRef.current?.remove(); mapRef.current = null; markerRef.current = null; };
+  }, [allowed]);
+
+  const visibleCats = cats.filter((c) => (f.group === "commercial" ? c.group_kind === "commercial" : c.group_kind !== "commercial"));
+  const cat = cats.find((c) => String(c.id) === String(f.category_id));
+  const isRes = cat?.details_kind === "residential";
+
+  const pick = (e) => {
+    const list = [...e.target.files];
+    const ok = list.filter((x) => /^image\/(png|jpe?g)$/.test(x.type) && x.size <= 5 * 1024 * 1024);
+    if (ok.length < list.length) setErr("بعض الصور تم تجاهلها (PNG/JPG وحد أقصى 5 ميجا)");
+    setFiles((p) => [...p, ...ok].slice(0, 15));
+    e.target.value = "";
+  };
+
+  const submit = async (e) => {
+    e.preventDefault(); setErr("");
+    const phone = normPhone(f.phone);
+    if (!f.category_id) return setErr("اختر نوع العقار");
+    if (f.title.trim().length < 5) return setErr("اكتب عنواناً لا يقل عن 5 أحرف");
+    if (!f.price || Number(f.price) <= 0) return setErr("اكتب السعر");
+    if (!f.region_id) return setErr("اختر المنطقة");
+    if (!phone) return setErr("رقم الموبايل غير صحيح (مثال: 01012345678)");
+    if (files.length < 1) return setErr("أضف صورة واحدة على الأقل");
+    setBusy(true);
+    try {
+      const { data: l, error } = await supabase.from("listings").insert({
+        user_id: user.id, category_id: Number(f.category_id), region_id: Number(f.region_id), deal_type: f.deal_type,
+        title: f.title.trim(), description: f.description.trim() || null, price: Number(f.price),
+        area: f.area ? Number(f.area) : null, area_unit: f.area_unit, contact_phone: phone,
+        duration_days: f.duration_days, lat: f.lat, lng: f.lng, furnishing: f.furnishing || null, features: f.features,
+      }).select("id").single();
+      if (error) throw error;
+      if (isRes) {
+        const { error: e2 } = await supabase.from("listing_residential_details").insert({
+          listing_id: l.id, rooms: f.rooms ? Number(f.rooms) : null, bathrooms: f.bathrooms ? Number(f.bathrooms) : null,
+          floor: f.floor !== "" ? Number(f.floor) : null, finishing: f.finishing || null,
+        });
+        if (e2) throw e2;
+      }
+      for (let i = 0; i < files.length; i++) {
+        const ext = files[i].type === "image/png" ? "png" : "jpg";
+        const path = `${user.id}/${l.id}/${Date.now()}-${i}.${ext}`;
+        const up = await supabase.storage.from("listing-images").upload(path, files[i], { contentType: files[i].type });
+        if (up.error) throw up.error;
+        const { error: e3 } = await supabase.from("listing_images").insert({ listing_id: l.id, storage_path: path, sort_order: i });
+        if (e3) throw e3;
+      }
+      router.push("/dashboard?added=1");
+    } catch (x) {
+      setErr(x?.message || "حدث خطأ، حاول مرة أخرى");
+      setBusy(false);
+    }
+  };
+
+  if (!user) return <main className={s.wrap} dir="rtl"><p>سجّل دخولك لإضافة إعلان.</p><Link className={s.btn} href="/auth">تسجيل الدخول</Link></main>;
+
+  const Seg = ({ value, onChange, items }) => (
+    <div className={s.seg}>{items.map(([k, l]) => <button type="button" key={k} className={value === k ? s.on : ""} onClick={() => onChange(k)}>{l}</button>)}</div>
+  );
+
+  return (
+    <main className={s.wrap} dir="rtl">
+      <h1>أضف إعلان جديد</h1>
+      <p className={s.sub}>اعرض عقارك على آلاف المهتمين مجاناً</p>
+      <form onSubmit={submit}>
+        <section className={s.card}>
+          <h2>نوع العقار</h2>
+          <Seg value={f.deal_type} onChange={(v) => set("deal_type", v)} items={[["sale","للبيع"],["rent","للإيجار"]]} />
+          <Seg value={f.group} onChange={(v) => { set("group", v); set("category_id", ""); }} items={[["residential","سكني"],["commercial","تجاري"]]} />
+          <select className={s.in} value={f.category_id} onChange={(e) => set("category_id", e.target.value)}>
+            <option value="">اختر النوع</option>
+            {visibleCats.map((c) => <option key={c.id} value={c.id}>{c.name_ar}</option>)}
+          </select>
+        </section>
+        <section className={s.card}>
+          <h2>تفاصيل العقار</h2>
+          <input className={s.in} placeholder="عنوان الإعلان" maxLength={120} value={f.title} onChange={(e) => set("title", e.target.value)} />
+          <div className={s.two}>
+            <input className={s.in} type="number" min="0" placeholder="السعر (جنيه)" value={f.price} onChange={(e) => set("price", e.target.value)} />
+            <div className={s.two}>
+              <input className={s.in} type="number" min="0" step="any" placeholder="المساحة" value={f.area} onChange={(e) => set("area", e.target.value)} />
+              <select className={s.in} value={f.area_unit} onChange={(e) => set("area_unit", e.target.value)}>{UNITS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+            </div>
+          </div>
+          {isRes && (<>
+            <div className={s.three}>
+              <input className={s.in} type="number" min="0" placeholder="عدد الغرف" value={f.rooms} onChange={(e) => set("rooms", e.target.value)} />
+              <input className={s.in} type="number" min="0" placeholder="الحمامات" value={f.bathrooms} onChange={(e) => set("bathrooms", e.target.value)} />
+              <input className={s.in} type="number" placeholder="الدور" value={f.floor} onChange={(e) => set("floor", e.target.value)} />
+            </div>
+            <select className={s.in} value={f.finishing} onChange={(e) => set("finishing", e.target.value)}>
+              <option value="">اختر التشطيب</option>{FINISH.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+          </>)}
+          <select className={s.in} value={f.furnishing} onChange={(e) => set("furnishing", e.target.value)}>
+            <option value="">اختر حالة الفرش</option>{FURN.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
+          <h3>المميزات والخدمات</h3>
+          <div className={s.chips}>
+            {FEATURES.map(([k, l]) => (
+              <label key={k} className={f.features.includes(k) ? s.chip + " " + s.on : s.chip}>
+                <input type="checkbox" hidden checked={f.features.includes(k)} onChange={() => set("features", f.features.includes(k) ? f.features.filter((x) => x !== k) : [...f.features, k])} />{l}
+              </label>
+            ))}
+          </div>
+        </section>
+        <section className={s.card}>
+          <h2>الموقع</h2>
+          <select className={s.in} value={f.region_id} onChange={(e) => set("region_id", e.target.value)}>
+            <option value="">اختر المنطقة</option>{regions.map((r) => <option key={r.id} value={r.id}>{r.name_ar}</option>)}
+          </select>
+          <div ref={mapEl} className={s.map} />
+          <small>{f.lat ? "تم تحديد الموقع ✓" : "اضغط على الخريطة لتحديد موقع العقار"}</small>
+        </section>
+        <section className={s.card}>
+          <h2>الوصف</h2>
+          <textarea className={s.in} rows={5} maxLength={500} value={f.description} onChange={(e) => set("description", e.target.value)} />
+          <small>{f.description.length}/500</small>
+        </section>
+        <section className={s.card}>
+          <h2>الصور</h2>
+          <label className={s.btn2}>إضافة صور<input type="file" accept="image/png,image/jpeg" multiple hidden onChange={pick} /></label>
+          <small>{files.length}/15 صور • PNG أو JPG (بحد أقصى 5 ميجابايت للصورة)</small>
+          <div className={s.thumbs}>
+            {files.map((x, i) => (
+              <div key={i} className={s.th}><img src={URL.createObjectURL(x)} alt="" /><button type="button" onClick={() => setFiles(files.filter((_, j) => j !== i))}>×</button></div>
+            ))}
+          </div>
+        </section>
+        <section className={s.card}>
+          <h2>بيانات التواصل</h2>
+          <input className={s.in} dir="ltr" inputMode="tel" placeholder="01012345678" value={f.phone} onChange={(e) => set("phone", e.target.value)} />
+          <small>اكتب رقمك المصري بأي صيغة</small>
+          <h3>مدة الإعلان</h3>
+          <Seg value={f.duration_days} onChange={(v) => set("duration_days", v)} items={DURATIONS.map((d) => [d, d + " يوم"])} />
+        </section>
+        {err && <p className={s.err}>{err}</p>}
+        <p className={s.note}>سيتم مراجعة إعلانك من قبل فريقنا قبل نشره — تستغرق المراجعة عادةً 24 ساعة</p>
+        <button className={s.btn} disabled={busy}>{busy ? "جارٍ النشر..." : "نشر الإعلان"}</button>
+      </form>
+    </main>
+  );
+}

@@ -8,6 +8,7 @@ import { normalize } from "@/lib/normalize";
 import { useAuth } from "@/lib/AuthContext";
 import { waLink } from "@/components/PropertyCard";
 
+import { ShareTrigger, ReportTrigger, InquiryForm } from "@/components/ListingActions";
 export default function ListingPage({ params }) {
   const { id } = use(params);
   const { user } = useAuth();
@@ -79,10 +80,11 @@ export default function ListingPage({ params }) {
           <a className="btn btn-wa full" href={waLink(p.phone, p.title)} target="_blank" rel="noreferrer"><MessageCircle size={16} /> واتساب</a>
           {isMine && <Link href={`/dashboard/edit/${id}`} className="btn btn-outline full"><Pencil size={15} /> تعديل الإعلان</Link>}
           {isMine && raw.status !== "published" && <p className="warn">هذا الإعلان {raw.status === "pending" ? "قيد المراجعة" : "مرفوض"} ولا يظهر للزوار.</p>}
-          <div className="d-actions">
+          <InquiryForm />
+<div className="d-actions">
             <button onClick={toggleFav}><Heart size={16} fill={fav ? "#e8743b" : "none"} /> {fav ? "محفوظ" : "حفظ"}</button>
-            <button onClick={share}><Share2 size={16} /> مشاركة</button>
-            <button onClick={() => alert("تم استلام البلاغ، شكراً لك.")}><Flag size={16} /> إبلاغ</button>
+            <ShareTrigger><Share2 size={16} /> مشاركة</ShareTrigger>
+            <ReportTrigger><Flag size={16} /> إبلاغ</ReportTrigger>
           </div>
           {!user && <p className="hint">سجّل مجاناً لحفظ العقارات واستلام تنبيه عند نزول عقار بمواصفاتك.</p>}
         </aside>

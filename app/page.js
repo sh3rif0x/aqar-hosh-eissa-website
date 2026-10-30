@@ -17,6 +17,7 @@ export default function HomePage() {
       <DbSection eyebrow="أحدث الإعلانات" title="أحدث العقارات" filters={{ sort: "newest" }} />
       <DbSection eyebrow="شراء" title="عقارات للبيع" filters={{ deal_type: "sale" }} href="/browse?deal=sale" alt />
       <DbSection eyebrow="إيجار" title="عقارات للإيجار" filters={{ deal_type: "rent" }} href="/browse?deal=rent" />
+      <DbSection eyebrow="إيجار" title="عقارات تجاري" filters={{ deal_type: "rent" }} href="/commercial" />
       <Trust />
       <CtaBanner />
       <Faq />
