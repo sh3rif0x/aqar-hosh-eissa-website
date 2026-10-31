@@ -50,20 +50,6 @@
       }
     }
   },
-  "/admin": {
-    "hints": 64,
-    "slots": {
-      "children": {
-        "hints": 96,
-        "slots": {
-          "children": {
-            "hints": 160,
-            "slots": null
-          }
-        }
-      }
-    }
-  },
   "/auth": {
     "hints": 64,
     "slots": {
@@ -144,7 +130,7 @@
       }
     }
   },
-  "/dashboard/new": {
+  "/dashboard/monitor": {
     "hints": 64,
     "slots": {
       "children": {
@@ -177,25 +163,6 @@
       }
     }
   },
-  "/dashboard/profile": {
-    "hints": 64,
-    "slots": {
-      "children": {
-        "hints": 96,
-        "slots": {
-          "children": {
-            "hints": 96,
-            "slots": {
-              "children": {
-                "hints": 160,
-                "slots": null
-              }
-            }
-          }
-        }
-      }
-    }
-  },
   "/favorites": {
     "hints": 64,
     "slots": {
@@ -211,6 +178,34 @@
     }
   },
   "/my-listings": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 160,
+            "slots": null
+          }
+        }
+      }
+    }
+  },
+  "/my-profile": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 160,
+            "slots": null
+          }
+        }
+      }
+    }
+  },
+  "/notifications": {
     "hints": 64,
     "slots": {
       "children": {

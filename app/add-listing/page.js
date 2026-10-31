@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
+import { VODA, WA } from "@/lib/payment";
 import "leaflet/dist/leaflet.css";
 import s from "./add.module.css";
 
@@ -12,6 +13,33 @@ const DURATIONS = [30, 60, 90, 180, 365];
 const FINISH = [["unfinished","على الطوب"],["semi_finished","نصف تشطيب"],["fully_finished","تشطيب كامل"],["super_lux","سوبر لوكس"]];
 const FURN = [["furnished","مفروش"],["semi_furnished","نصف مفروش"],["unfurnished","بدون فرش"]];
 const UNITS = [["sqm","م²"],["feddan","فدان"],["qirat","قيراط"],["sahm","سهم"]];
+const MAX_IMAGES = 8; // الحد الأقصى في الداتابيز
+
+function FeaturedPromo() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    try {
+      const last = Number(localStorage.getItem("promo_seen") || 0);
+      if (Date.now() - last > 48 * 3600 * 1000) setShow(true);
+    } catch { setShow(true); }
+  }, []);
+  if (!show) return null;
+  const close = () => { try { localStorage.setItem("promo_seen", String(Date.now())); } catch {} setShow(false); };
+  return (
+    <div style={{ background: "#fff7e6", border: "1px solid #b8731f", borderRadius: 12, padding: 16, marginBottom: 16, lineHeight: 1.9 }}>
+      <b>⭐ ميّز إعلانك بـ 50 جنيه فقط</b>
+      <ol style={{ margin: "8px 0", paddingInlineStart: 20 }}>
+        <li>حوّل 50 جنيه على فودافون كاش: <b dir="ltr">{VODA}</b></li>
+        <li>صوّر شاشة التحويل (سكرين شوت).</li>
+        <li>ابعتها على واتساب مع <b>لينك الإعلان</b> اللي عايز تميّزه.</li>
+        <li>هنفعّل التمييز يدوياً بعد مراجعة التحويل.</li>
+      </ol>
+      <Link href="/featured" style={{ marginInlineEnd: 12 }}>التفاصيل والأسعار</Link>
+      <a href={`https://wa.me/${WA}`} target="_blank" rel="noreferrer" style={{ marginInlineEnd: 12 }}>إرسال عبر واتساب</a>
+      <button type="button" onClick={close}>إغلاق</button>
+    </div>
+  );
+}
 
 function normPhone(v) {
   let d = (v || "").replace(/\D/g, "");
@@ -21,12 +49,19 @@ function normPhone(v) {
   return /^1[0125]\d{8}$/.test(d) ? "0" + d : null;
 }
 
+function quotaMsg(q) {
+  if (q?.account_type === "broker")
+    return "انتهت إعلاناتك المجانية. للاستمرار: 10 إعلانات بـ 100 جنيه أو 30 إعلان بـ 250 جنيه. الدفع على فودافون كاش " + VODA + " ثم ابعت السكرين شوت على واتساب.";
+  return "وصلت للحد الأقصى: 5 إعلانات في الشهر للحسابات العادية. لو أنت سمسار أو مكتب عقارات تواصل معنا على واتساب لترقية حسابك.";
+}
+
 export default function AddListing() {
   const { user } = useAuth();
   const router = useRouter();
   const [cats, setCats] = useState([]);
   const [regions, setRegions] = useState([]);
   const [allowed, setAllowed] = useState(null);
+  const [quota, setQuota] = useState(null);
   const [f, setF] = useState({
     deal_type: "sale", group: "residential", category_id: "", title: "", price: "", area: "", area_unit: "sqm",
     rooms: "", bathrooms: "", floor: "", finishing: "", furnishing: "", features: [], region_id: "",
@@ -39,12 +74,13 @@ export default function AddListing() {
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
 
   useEffect(() => {
-    supabase.from("categories").select("id,slug,name_ar,details_kind,group_kind").eq("is_active", true).order("sort_order").then(({ data }) => setCats(data || []));
-    supabase.from("regions").select("id,name_ar").eq("is_active", true).order("sort_order").then(({ data }) => setRegions(data || []));
+    supabase.from("categories").select("id,slug,name_ar,details_kind,group_kind").eq("is_active", true).order("sort_order").then(({ data, error }) => { if (error) { console.error("categories error:", error); setErr("تعذر تحميل أنواع العقارات: " + error.message); } setCats(data || []); });
+    supabase.from("regions").select("id,name_ar").eq("is_active", true).order("sort_order").then(({ data, error }) => { if (error) { console.error("regions error:", error); setErr("تعذر تحميل المناطق: " + error.message); } setRegions(data || []); });
   }, []);
 
   useEffect(() => {
     if (!user) return;
+    supabase.rpc("get_my_quota").then(({ data }) => setQuota(data || null));
     supabase.rpc("get_my_profile").then(({ data }) => {
       setAllowed(true);
       if (data?.phone) setF((x) => ({ ...x, phone: x.phone || data.phone }));
@@ -78,7 +114,7 @@ export default function AddListing() {
     const list = [...e.target.files];
     const ok = list.filter((x) => /^image\/(png|jpe?g)$/.test(x.type) && x.size <= 5 * 1024 * 1024);
     if (ok.length < list.length) setErr("بعض الصور تم تجاهلها (PNG/JPG وحد أقصى 5 ميجا)");
-    setFiles((p) => [...p, ...ok].slice(0, 15));
+    setFiles((p) => [...p, ...ok].slice(0, MAX_IMAGES));
     e.target.value = "";
   };
 
@@ -88,7 +124,9 @@ export default function AddListing() {
     if (!f.category_id) return setErr("اختر نوع العقار");
     if (f.title.trim().length < 5) return setErr("اكتب عنواناً لا يقل عن 5 أحرف");
     if (!f.price || Number(f.price) <= 0) return setErr("اكتب السعر");
+    if (!f.area || Number(f.area) <= 0) return setErr("اكتب المساحة");
     if (!f.region_id) return setErr("اختر المنطقة");
+    if (quota && quota.remaining <= 0) return setErr(quotaMsg(quota));
     if (!phone) return setErr("رقم الموبايل غير صحيح (مثال: 01012345678)");
     if (files.length < 1) return setErr("أضف صورة واحدة على الأقل");
     setBusy(true);
@@ -96,7 +134,7 @@ export default function AddListing() {
       const { data: l, error } = await supabase.from("listings").insert({
         user_id: user.id, category_id: Number(f.category_id), region_id: Number(f.region_id), deal_type: f.deal_type,
         title: f.title.trim(), description: f.description.trim() || null, price: Number(f.price),
-        area: f.area ? Number(f.area) : null, area_unit: f.area_unit, contact_phone: phone,
+        area: Number(f.area), area_unit: f.area_unit, contact_phone: phone,
         duration_days: f.duration_days, lat: f.lat, lng: f.lng, furnishing: f.furnishing || null, features: f.features,
       }).select("id").single();
       if (error) throw error;
@@ -117,7 +155,12 @@ export default function AddListing() {
       }
       router.push("/dashboard?added=1");
     } catch (x) {
-      setErr(x?.message || "حدث خطأ، حاول مرة أخرى");
+      const m = x?.message || "";
+      setErr(
+        m.includes("owner_monthly_limit") ? quotaMsg({ account_type: "owner" }) :
+        m.includes("broker_quota_exceeded") ? quotaMsg({ account_type: "broker" }) :
+        (m || "حدث خطأ، حاول مرة أخرى")
+      );
       setBusy(false);
     }
   };
@@ -131,7 +174,15 @@ export default function AddListing() {
   return (
     <main className={s.wrap} dir="rtl">
       <h1>أضف إعلان جديد</h1>
+      <FeaturedPromo />
       <p className={s.sub}>اعرض عقارك على آلاف المهتمين مجاناً</p>
+      {quota && (
+        <p className={s.note}>
+          {quota.remaining > 0
+            ? `متبقي لك ${quota.remaining} من ${quota.limit} إعلان ${quota.period === "month" ? "هذا الشهر" : ""}`
+            : quotaMsg(quota)}
+        </p>
+      )}
       <form onSubmit={submit}>
         <section className={s.card}>
           <h2>نوع العقار</h2>
@@ -190,7 +241,7 @@ export default function AddListing() {
         <section className={s.card}>
           <h2>الصور</h2>
           <label className={s.btn2}>إضافة صور<input type="file" accept="image/png,image/jpeg" multiple hidden onChange={pick} /></label>
-          <small>{files.length}/15 صور • PNG أو JPG (بحد أقصى 5 ميجابايت للصورة)</small>
+          <small>{files.length}/{MAX_IMAGES} صور • PNG أو JPG (بحد أقصى 5 ميجابايت للصورة)</small>
           <div className={s.thumbs}>
             {files.map((x, i) => (
               <div key={i} className={s.th}><img src={URL.createObjectURL(x)} alt="" /><button type="button" onClick={() => setFiles(files.filter((_, j) => j !== i))}>×</button></div>
@@ -206,7 +257,7 @@ export default function AddListing() {
         </section>
         {err && <p className={s.err}>{err}</p>}
         <p className={s.note}>سيتم مراجعة إعلانك من قبل فريقنا قبل نشره — تستغرق المراجعة عادةً 24 ساعة</p>
-        <button className={s.btn} disabled={busy}>{busy ? "جارٍ النشر..." : "نشر الإعلان"}</button>
+        <button className={s.btn} disabled={busy || (quota && quota.remaining <= 0)}>{busy ? "جارٍ النشر..." : "نشر الإعلان"}</button>
       </form>
     </main>
   );

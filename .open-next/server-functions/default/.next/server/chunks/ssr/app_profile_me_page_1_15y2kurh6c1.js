@@ -1,3 +1,3 @@
-module.exports=[11647,a=>{"use strict";var b=a.i(87924),c=a.i(72131),d=a.i(50944),e=a.i(29845);a.s(["default",0,function(){let a=(0,d.useRouter)();return(0,c.useEffect)(()=>{(async()=>{let{data:{user:b}}=await e.f.auth.getUser();if(!b)return a.replace("/auth");let{data:c}=await e.f.rpc("get_my_profile");c?.username?a.replace(`/profile/${c.username}`):a.replace("/")})()},[a]),(0,b.jsx)("main",{dir:"rtl",style:{padding:"2rem",textAlign:"center"},children:"جارٍ التحميل..."})}])}];
+module.exports=[11647,a=>{"use strict";var b=a.i(87924),c=a.i(72131),d=a.i(50944),e=a.i(29845);a.s(["default",0,function(){let a=(0,d.useRouter)();return(0,c.useEffect)(()=>{(async()=>{let{data:{user:b}}=await e.f.auth.getUser();a.replace(b?`/profile/${b.id}`:"/auth")})()},[a]),(0,b.jsx)("main",{dir:"rtl",style:{padding:"2rem",textAlign:"center"},children:"جارٍ التحميل..."})}])}];
 
 //# sourceMappingURL=app_profile_me_page_1_15y2kurh6c1.js.map

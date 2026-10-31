@@ -1,0 +1,3 @@
+module.exports=[[47077,a=>{var b=a.i(7997),c=a.i(31775);a.s(["default",0,function({children:a}){return(0,b.jsxs)(b.Fragment,{children:[a,(0,b.jsx)(c.default,{})]})}])},47312,a=>{let b=(0,a.i(11857).registerClientReference)(function(){throw Error("Attempted to call the default export of [project]/components/AdvertiserLink.js from the server, but it's on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of a Client Component.")},"[project]/components/AdvertiserLink.js","default");a.s(["default",0,b])},31775,a=>{var b=a.i(47312);a.n(b)}],16539,function(a){a.n(a.i(47077))}];
+
+//# sourceMappingURL=_0ceryiff08bc6._.js.map

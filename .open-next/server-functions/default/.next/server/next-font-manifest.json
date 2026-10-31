@@ -12,10 +12,6 @@
       "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
     ],
-    "[project]/app/admin/page": [
-      "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
-      "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
-    ],
     "[project]/app/auth/page": [
       "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
@@ -36,19 +32,15 @@
       "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
     ],
-    "[project]/app/dashboard/edit/[id]/page": [
+    "[project]/app/dashboard/monitor/[section]/page": [
       "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
     ],
-    "[project]/app/dashboard/new/page": [
+    "[project]/app/dashboard/monitor/page": [
       "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
     ],
     "[project]/app/dashboard/page": [
-      "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
-      "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
-    ],
-    "[project]/app/dashboard/profile/page": [
       "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
     ],
@@ -60,11 +52,27 @@
       "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
     ],
+    "[project]/app/my-listings/edit/[id]/page": [
+      "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
+      "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
+    ],
     "[project]/app/my-listings/page": [
       "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
     ],
+    "[project]/app/my-profile/page": [
+      "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
+      "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
+    ],
+    "[project]/app/notifications/page": [
+      "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
+      "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
+    ],
     "[project]/app/page": [
+      "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
+      "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
+    ],
+    "[project]/app/profile/[id]/page": [
       "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
     ],

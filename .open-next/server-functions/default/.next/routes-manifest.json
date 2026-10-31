@@ -23,12 +23,12 @@
   },
   "dynamicRoutes": [
     {
-      "page": "/dashboard/edit/[id]",
-      "regex": "^/dashboard/edit/([^/]+?)(?:/)?$",
+      "page": "/dashboard/monitor/[section]",
+      "regex": "^/dashboard/monitor/([^/]+?)(?:/)?$",
       "routeKeys": {
-        "nxtPid": "nxtPid"
+        "nxtPsection": "nxtPsection"
       },
-      "namedRegex": "^/dashboard/edit/(?<nxtPid>[^/]+?)(?:/)?$"
+      "namedRegex": "^/dashboard/monitor/(?<nxtPsection>[^/]+?)(?:/)?$"
     },
     {
       "page": "/listing/[id]",
@@ -37,6 +37,22 @@
         "nxtPid": "nxtPid"
       },
       "namedRegex": "^/listing/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/my-listings/edit/[id]",
+      "regex": "^/my\\-listings/edit/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/my\\-listings/edit/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/profile/[id]",
+      "regex": "^/profile/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/profile/(?<nxtPid>[^/]+?)(?:/)?$"
     }
   ],
   "staticRoutes": [
@@ -71,10 +87,10 @@
       "namedRegex": "^/add\\-listing(?:/)?$"
     },
     {
-      "page": "/admin",
-      "regex": "^/admin(?:/)?$",
+      "page": "/api/track",
+      "regex": "^/api/track(?:/)?$",
       "routeKeys": {},
-      "namedRegex": "^/admin(?:/)?$"
+      "namedRegex": "^/api/track(?:/)?$"
     },
     {
       "page": "/auth",
@@ -113,22 +129,10 @@
       "namedRegex": "^/dashboard/admin(?:/)?$"
     },
     {
-      "page": "/dashboard/new",
-      "regex": "^/dashboard/new(?:/)?$",
+      "page": "/dashboard/monitor",
+      "regex": "^/dashboard/monitor(?:/)?$",
       "routeKeys": {},
-      "namedRegex": "^/dashboard/new(?:/)?$"
-    },
-    {
-      "page": "/dashboard/profile",
-      "regex": "^/dashboard/profile(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/dashboard/profile(?:/)?$"
-    },
-    {
-      "page": "/favicon.ico",
-      "regex": "^/favicon\\.ico(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/favicon\\.ico(?:/)?$"
+      "namedRegex": "^/dashboard/monitor(?:/)?$"
     },
     {
       "page": "/favorites",
@@ -137,10 +141,28 @@
       "namedRegex": "^/favorites(?:/)?$"
     },
     {
+      "page": "/icon.png",
+      "regex": "^/icon\\.png(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/icon\\.png(?:/)?$"
+    },
+    {
       "page": "/my-listings",
       "regex": "^/my\\-listings(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/my\\-listings(?:/)?$"
+    },
+    {
+      "page": "/my-profile",
+      "regex": "^/my\\-profile(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/my\\-profile(?:/)?$"
+    },
+    {
+      "page": "/notifications",
+      "regex": "^/notifications(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/notifications(?:/)?$"
     },
     {
       "page": "/profile",

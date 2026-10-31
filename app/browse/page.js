@@ -50,7 +50,7 @@ function Browse() {
       min_price: num("min"), max_price: num("max"), search: g("search") || null,
       min_area: num("amin"), max_area: num("amax"), area_unit: g("unit") || null,
       min_rooms: num("rooms"), min_baths: num("baths"), finishing: g("finish") || null,
-      advertiser_type: g("by") || null, featured_only: g("featured") === "1",
+      advertiser_type: g("by") || null, featured_only: ["1", "true"].includes(g("featured")),
       sort: g("sort") || "newest", limit: PAGE, offset: page * PAGE,
     }).then(setData).catch((e) => setError(e.message));
   }, [sp, page]);
@@ -133,7 +133,7 @@ function Browse() {
         <Chips k="by" options={[["owner", "🟢 مالك مباشر"], ["broker", "🔵 مكتب عقاري"]]} />
       </div>
 
-      <div className="fg"><label>إعلانات مميزة</label>
+      <div className="fg"><label>عقارات مميزة</label>
         <Chips k="featured" options={[["1", "المميزة فقط"]]} all="الكل" />
       </div>
     </aside>
