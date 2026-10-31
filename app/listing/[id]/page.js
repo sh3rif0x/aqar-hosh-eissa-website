@@ -78,7 +78,7 @@ export default function ListingPage({ params }) {
           </div>
           <a className="btn full" href={`tel:${p.phone}`}><Phone size={16} /> اتصل الآن</a>
           <a className="btn btn-wa full" href={waLink(p.phone, p.title)} target="_blank" rel="noreferrer"><MessageCircle size={16} /> واتساب</a>
-          {isMine && <Link href={`/dashboard/edit/${id}`} className="btn btn-outline full"><Pencil size={15} /> تعديل الإعلان</Link>}
+          {isMine && <Link href={`/my-listings/edit/${id}`} className="btn btn-outline full"><Pencil size={15} /> تعديل الإعلان</Link>}
           {isMine && raw.status !== "published" && <p className="warn">هذا الإعلان {raw.status === "pending" ? "قيد المراجعة" : "مرفوض"} ولا يظهر للزوار.</p>}
           <InquiryForm />
 <div className="d-actions">

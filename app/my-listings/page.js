@@ -1,65 +1,83 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Plus, Trash2, Pencil, UserCog } from "lucide-react";
+import { listings, profile } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
+import { normalize, items } from "@/lib/normalize";
+import AccountTypeBadge from "@/components/AccountTypeBadge";
 
-const ST = { pending: ["قيد المراجعة", "#b45309"], published: ["منشور", "#166534"], rejected: ["مرفوض", "#b91c1c"] };
+const STATUS = { pending: "قيد المراجعة", published: "منشور", rejected: "مرفوض" };
 
-export default function MyListings() {
-  const { user } = useAuth();
-  const [rows, setRows] = useState(null);
+export default function Page() { return <Suspense><MyListings /></Suspense>; }
 
-  const load = () =>
-    supabase.from("listings")
-      .select("id,title,price,status,rejection_reason,expires_at,deal_type,listing_images(storage_path,sort_order)")
-      .eq("user_id", user.id).order("created_at", { ascending: false })
-      .then(({ data }) => setRows(data || []));
+function MyListings() {
+  const { user, me, loading } = useAuth();
+  const router = useRouter();
+  const edited = useSearchParams().get("edited");
+  const [list, setList] = useState(null);
+  const [quota, setQuota] = useState(null);
+  const [office, setOffice] = useState("");
+  const [err, setErr] = useState("");
 
-  useEffect(() => { if (user) load(); }, [user]);
-
-  const del = async (id) => {
-    if (!confirm("حذف الإعلان نهائياً؟")) return;
-    await supabase.from("listings").delete().eq("id", id);
-    load();
+  const load = () => {
+    listings.mine({ limit: 50 }).then((d) => setList(items(d))).catch(() => setList([]));
+    profile.quota().then(setQuota).catch(() => {});
   };
-  const img = (r) => {
-    const p = [...(r.listing_images || [])].sort((a, b) => a.sort_order - b.sort_order)[0]?.storage_path;
-    return p ? supabase.storage.from("listing-images").getPublicUrl(p).data.publicUrl : null;
-  };
+  useEffect(() => { if (!loading && !user) router.push("/auth?reason=add"); else if (user) load(); }, [user, loading]);
 
-  if (!user) return <main dir="rtl" style={{ padding: "2rem", textAlign: "center" }}><p>سجّل دخولك لعرض إعلاناتك.</p><Link href="/auth">تسجيل الدخول</Link></main>;
+  const remove = async (id) => { if (confirm("حذف الإعلان؟")) { await listings.remove(id); load(); } };
+
+  if (!user || !quota) return <section className="section"><div className="container"><div className="card skel" /></div></section>;
 
   return (
-    <main dir="rtl" style={{ maxWidth: 900, margin: "0 auto", padding: "1.5rem 1rem 4rem" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <h1 style={{ margin: 0 }}>إعلاناتي</h1>
-        <Link href="/add-listing" style={{ background: "#b8731f", color: "#fff", padding: ".6rem 1.1rem", borderRadius: 10, textDecoration: "none", fontWeight: 700 }}>+ أضف إعلان</Link>
-      </div>
-      {rows === null ? <p>جارٍ التحميل...</p> : rows.length === 0 ? <p style={{ marginTop: "1.5rem" }}>ما عندكش إعلانات لسه.</p> : (
-        <div style={{ display: "grid", gap: ".8rem", marginTop: "1rem" }}>
-          {rows.map((r) => {
-            const [label, color] = ST[r.status] || [r.status, "#555"];
-            return (
-              <div key={r.id} style={{ display: "flex", gap: ".9rem", background: "#fff", border: "1px solid #e4e0d6", borderRadius: 14, padding: ".7rem", alignItems: "center" }}>
-                {img(r) ? <img src={img(r)} alt="" style={{ width: 96, height: 76, objectFit: "cover", borderRadius: 10 }} /> : <div style={{ width: 96, height: 76, background: "#f1eee5", borderRadius: 10 }} />}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <b style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</b>
-                  <div>{Number(r.price).toLocaleString("ar-EG")} ج.م</div>
-                  <small style={{ color, fontWeight: 700 }}>{label}</small>
-                  {r.status === "rejected" && r.rejection_reason && <small style={{ display: "block", color: "#b91c1c" }}>السبب: {r.rejection_reason}</small>}
-                  {r.expires_at && r.status === "published" && <small style={{ display: "block", color: "#6b7a76" }}>ينتهي: {new Date(r.expires_at).toLocaleDateString("ar-EG")}</small>}
-                </div>
-                <div style={{ display: "flex", gap: ".4rem", flexDirection: "column" }}>
-                  {r.status === "published" && <Link href={`/listing/${r.id}`}>عرض</Link>}
-                  <Link href={`/dashboard/edit/${r.id}`}>تعديل</Link>
-                  <button onClick={() => del(r.id)} style={{ color: "#b91c1c", background: "none", border: 0, cursor: "pointer", font: "inherit" }}>حذف</button>
-                </div>
+    <section className="section" style={{ minHeight: "70vh" }}><div className="container">
+      <header className="sec-head">
+        <h2>إعلاناتي</h2>
+        <Link href="/add-listing" className="btn"><Plus size={15} /> إعلان جديد</Link>
+      </header>
+
+      <div className="acct">
+        <AccountTypeBadge />
+        <input className="office" placeholder="اسم المكتب العقاري (للمكاتب والسماسرة)" value={office || me?.office_name || ""} onChange={(e) => setOffice(e.target.value)} />
+        {err && <p className="err">{err}</p>}
+
+        {quota.unlimited ? (
+          <p className="ok">🟢 حساب مالك — الإعلانات مجانية وبدون حد. (استخدمت {quota.used})</p>
+        ) : (
+          <div className="quota">
+            <p>🔵 مكتب — استخدمت <b>{quota.used}</b> من <b>{quota.limit}</b> إعلان (المجاني {quota.free_limit}{quota.extra_ads ? ` + مشترى ${quota.extra_ads}` : ""})</p>
+            <div className="bar-q"><i style={{ width: `${Math.min(100, (quota.used / quota.limit) * 100)}%` }} /></div>
+            {quota.remaining <= 0 && (
+              <div className="plans">
+                <p className="err">انتهت إعلاناتك المجانية. اشترك لإضافة المزيد:</p>
+                <div><strong>10 إعلانات</strong><span>100 ج.م</span></div>
+                <div><strong>30 إعلان</strong><span>250 ج.م / شهر</span></div>
+                <small>الدفع الإلكتروني سيُفعّل قريباً.</small>
               </div>
-            );
-          })}
-        </div>
-      )}
-    </main>
+            )}
+          </div>
+        )}
+      </div>
+
+      {edited && <p className="warn">تم حفظ التعديلات. الإعلان الآن «قيد المراجعة» وسيظهر للزوار بعد موافقة الإدارة.</p>}
+      <Link href="/my-profile" className="btn btn-outline"><UserCog size={15} /> تعديل بيانات الحساب</Link>
+      <h3 className="d-sub">إعلاناتي</h3>
+      {!list && <div className="card skel" />}
+      {list?.length === 0 && <p className="empty">لا توجد إعلانات بعد.</p>}
+      <div className="my-list">
+        {list?.map((l) => (
+          <div key={l.id} className="my-item">
+            <div className="thumb" style={{ background: l.cover_path ? `url(${l.cover_path}) center/cover` : "#e6dfd3" }} />
+            <div className="grow"><Link href={`/listing/${l.id}`}><strong>{l.title}</strong></Link>
+              <small>{normalize(l).price}</small>{l.status === "rejected" && l.rejection_reason && <small className="rej">سبب الرفض: {l.rejection_reason}</small>}</div>
+            <span className={`st st-${l.status}`}>{STATUS[l.status]}</span>
+            <Link href={`/my-listings/edit/${l.id}`} className="icon-btn" aria-label="تعديل"><Pencil size={16} /></Link>
+            <button onClick={() => remove(l.id)} aria-label="حذف"><Trash2 size={16} /></button>
+          </div>
+        ))}
+      </div>
+    </div></section>
   );
 }

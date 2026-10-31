@@ -1,0 +1,28 @@
+import { Cairo } from "next/font/google";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import { AuthProvider } from "@/lib/AuthContext";
+import Tracker from "@/components/Tracker";
+import "./globals.css";
+
+const font = Cairo({ subsets: ["arabic", "latin"], weight: ["400", "500", "600", "700", "800"] });
+
+export const metadata = {
+  title: "عقار حوش عيسى | بيع وإيجار العقارات",
+  description: "بيع وإيجار العقارات في حوش عيسى والمناطق المحيطة.",
+};
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="ar" dir="rtl">
+      <body className={font.className}>
+        <Tracker />
+        <AuthProvider>
+          <Navbar />
+          {children}
+          <Footer />
+        </AuthProvider>
+      </body>
+    </html>
+  );
+}

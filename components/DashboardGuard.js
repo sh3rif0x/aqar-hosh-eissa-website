@@ -11,7 +11,7 @@ export default function DashboardGuard({ children }) {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return router.replace("/auth");
-      if (path.startsWith("/dashboard/edit")) return setOk(true);
+      if (path.startsWith("/my-listings/edit")) return setOk(true);
       const [{ data: p }, { data: adm }] = await Promise.all([supabase.rpc("get_my_profile"), supabase.rpc("is_admin")]);
       if (adm || (p && p.account_type !== "seeker")) setOk(true);
       else router.replace("/my-listings");

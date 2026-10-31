@@ -3,14 +3,14 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  LayoutDashboard, Plus, UserCog, Gauge, Users, Building2, Tags, MapPin, ShieldCheck, Flag,
+  Activity, Gauge, Users, Building2, Tags, MapPin, ShieldCheck, Flag,
   Bell, BarChart3, Settings, ScrollText, LogOut, Menu, X, ChevronDown,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
 import styles from "./dashboard.module.css";
+import { MONITOR_NAV } from "@/lib/monitor/registry";
 
-/* need: undefined = any admin | "super" = super admin only | permission name = admin with that permission */
 const ADMIN_NAV = [
   { key: "overview", label: "نظرة عامة", icon: Gauge, single: true },
   { key: "users", label: "المستخدمون", icon: Users, need: "users",
@@ -31,16 +31,13 @@ const ADMIN_NAV = [
     items: [["overview", "نظرة عامة"], ["users", "إحصائيات المستخدمين"], ["listings", "إحصائيات الإعلانات"]] },
   { key: "settings", label: "الإعدادات", icon: Settings, need: "super",
     items: [["general", "الإعدادات العامة"], ["contact", "بيانات التواصل"]] },
+  { key: "monitor", href: "/dashboard/monitor", label: "المراقبة والتتبع", icon: Activity, need: "super", items: MONITOR_NAV },
   { key: "logs", label: "سجل النشاط", icon: ScrollText, need: "super", single: true },
 ];
 
-const ADVERTISER_NAV = [
-  { label: "لوحة المعلن", href: "/dashboard", icon: LayoutDashboard },
-  { label: "إعلان جديد", href: "/dashboard/new", icon: Plus },
-  { label: "بيانات الحساب", href: "/dashboard/profile", icon: UserCog },
-];
+const subHref = (g, k) => (g.href ? (k === "overview" ? g.href : `${g.href}/${k}`) : `/dashboard/admin?s=${g.key}.${k}`);
 
-const ROLE_LABEL = { super_admin: "Super Admin", admin: "مشرف", user: "معلن" };
+const ROLE_LABEL = { super_admin: "Super Admin", admin: "مشرف" };
 
 export default function DashboardLayout({ children }) {
   return <Suspense fallback={<div className={styles.boot} />}><Shell>{children}</Shell></Suspense>;
@@ -51,35 +48,36 @@ function Shell({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const s = useSearchParams().get("s");
-  const [acc, setAcc] = useState({ role: "user", perms: [], name: "" });
+  const [acc, setAcc] = useState(null);
   const [open, setOpen] = useState(false);
   const [grp, setGrp] = useState({});
+
+  useEffect(() => { if (!loading && !user) router.replace("/auth"); }, [user, loading]);
 
   useEffect(() => {
     if (!user) return;
     let off = false;
     (async () => {
       const { data: me } = await supabase.rpc("get_my_profile");
+      const role = me?.role || "user";
+      if (role !== "admin" && role !== "super_admin") { if (!off) router.replace("/my-listings"); return; }
       let perms = [];
-      if (me?.role === "admin") {
+      if (role === "admin") {
         const { data } = await supabase.from("admin_permissions").select("perms").eq("user_id", me.id).maybeSingle();
         perms = data?.perms || [];
       }
-      if (!off) setAcc({ role: me?.role || "user", perms, name: me?.full_name || "" });
+      if (!off) setAcc({ role, perms, name: me?.full_name || "" });
     })();
     return () => { off = true; };
   }, [user]);
 
   useEffect(() => { setOpen(false); }, [pathname, s]);
 
-  if (!loading && !user) return children;
+  if (loading || !user || !acc) return <div className={styles.boot} />;
 
   const isSuper = acc.role === "super_admin";
-  const isAdmin = isSuper || acc.role === "admin";
   const allowed = (g) => !g.need || (g.need === "super" ? isSuper : isSuper || acc.perms.includes(g.need));
-  const onAdmin = pathname === "/dashboard/admin";
   const [curG, curSub] = (s || "overview").split(".");
-
   const logout = async () => { await supabase.auth.signOut(); router.push("/"); };
 
   return (
@@ -94,53 +92,43 @@ function Shell({ children }) {
         <div className={styles.sideTop}>
           <div>
             <strong>{acc.name || "حسابي"}</strong>
-            <span className={`${styles.role} ${isSuper ? styles.roleSuper : ""}`}>{ROLE_LABEL[acc.role] || "معلن"}</span>
+            <span className={`${styles.role} ${isSuper ? styles.roleSuper : ""}`}>{ROLE_LABEL[acc.role]}</span>
           </div>
           <button className={styles.close} onClick={() => setOpen(false)} aria-label="إغلاق"><X size={18} /></button>
         </div>
 
         <nav>
-          <p className={styles.cap}>حسابي</p>
-          {ADVERTISER_NAV.map((l) => (
-            <Link key={l.href} href={l.href} className={`${styles.link} ${!onAdmin && pathname === l.href ? styles.on : ""}`}>
-              <l.icon size={17} /> {l.label}
-            </Link>
-          ))}
-
-          {isAdmin && (
-            <>
-              <p className={styles.cap}>{isSuper ? "الإدارة · صلاحيات كاملة" : "الإدارة"}</p>
-              {ADMIN_NAV.filter(allowed).map((g) => {
-                const active = onAdmin && curG === g.key;
-                if (g.single) {
-                  return (
-                    <Link key={g.key} href={`/dashboard/admin?s=${g.key}`} className={`${styles.link} ${active ? styles.on : ""}`}>
-                      <g.icon size={17} /> {g.label}
-                    </Link>
-                  );
-                }
-                const isOpen = grp[g.key] ?? active;
-                return (
-                  <div key={g.key}>
-                    <button className={`${styles.link} ${styles.gbtn} ${active ? styles.on : ""}`} onClick={() => setGrp({ ...grp, [g.key]: !isOpen })}>
-                      <g.icon size={17} /> <span>{g.label}</span>
-                      <ChevronDown size={15} className={isOpen ? styles.flip : ""} />
-                    </button>
-                    {isOpen && (
-                      <div className={styles.subs}>
-                        {g.items.map(([k, label]) => (
-                          <Link key={k} href={`/dashboard/admin?s=${g.key}.${k}`} className={`${styles.sublink} ${active && (curSub || g.items[0][0]) === k ? styles.on : ""}`}>
-                            {label}
-                          </Link>
-                        ))}
-                      </div>
-                    )}
+          <p className={styles.cap}>{isSuper ? "الإدارة · صلاحيات كاملة" : "الإدارة"}</p>
+          {ADMIN_NAV.filter(allowed).map((g) => {
+            const active = g.href ? pathname.startsWith(g.href) : curG === g.key;
+            if (g.single) {
+              return (
+                <Link key={g.key} href={`/dashboard/admin?s=${g.key}`} className={`${styles.link} ${active ? styles.on : ""}`}>
+                  <g.icon size={17} /> {g.label}
+                </Link>
+              );
+            }
+            const isOpen = grp[g.key] ?? active;
+            return (
+              <div key={g.key}>
+                <button className={`${styles.link} ${styles.gbtn} ${active ? styles.on : ""}`} onClick={() => setGrp({ ...grp, [g.key]: !isOpen })}>
+                  <g.icon size={17} /> <span>{g.label}</span>
+                  <ChevronDown size={15} className={isOpen ? styles.flip : ""} />
+                </button>
+                {isOpen && (
+                  <div className={styles.subs}>
+                    {g.items.map(([k, label]) => (
+                      <Link key={k} href={subHref(g, k)} className={`${styles.sublink} ${(g.href ? pathname === subHref(g, k) : active && (curSub || g.items[0][0]) === k) ? styles.on : ""}`}>
+                        {label}
+                      </Link>
+                    ))}
                   </div>
-                );
-              })}
-            </>
-          )}
+                )}
+              </div>
+            );
+          })}
 
+          <Link href="/" className={styles.link}>← العودة للموقع</Link>
           <button className={`${styles.link} ${styles.logout}`} onClick={logout}><LogOut size={17} /> تسجيل الخروج</button>
         </nav>
       </aside>

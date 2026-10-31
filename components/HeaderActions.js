@@ -80,13 +80,44 @@ export function NotificationBell() {
           <div className={styles.list}>
             {data.items.length === 0 && <p className={styles.empty}>لا توجد إشعارات حتى الآن</p>}
             {data.items.map((n) => (
-              <button key={n.id} className={`${styles.item} ${n.read_at ? "" : styles.unread}`} onClick={() => readOne(n)}>
+              <div
+                key={n.id}
+                role="button"
+                tabIndex={0}
+                className={`${styles.item} ${n.read_at ? "" : styles.unread}`}
+                onClick={() => readOne(n)}
+                onKeyDown={(e) => e.key === "Enter" && readOne(n)}
+              >
+                {n.sender && (
+                  <Link
+                    href={`/profile/${n.sender.id}`}
+                    className={styles.sender}
+                    onClick={(e) => { e.stopPropagation(); readOne(n); setOpen(false); }}
+                  >
+                    <i className={styles.sAv} style={n.sender.avatar_url ? { backgroundImage: `url(${n.sender.avatar_url})` } : undefined}>
+                      {!n.sender.avatar_url && (n.sender.name || "؟")[0]}
+                    </i>
+                    {n.sender.name || "مستخدم"} · عرض البروفايل
+                  </Link>
+                )}
                 <strong>{n.title}</strong>
                 <span>{n.body}</span>
                 <small>{ago(n.created_at)}</small>
-              </button>
+                {n.listing_id && (
+                  <Link
+                    href={`/listing/${n.listing_id}`}
+                    className={styles.itemLink}
+                    onClick={(e) => { e.stopPropagation(); readOne(n); setOpen(false); }}
+                  >
+                    عرض الإعلان ←
+                  </Link>
+                )}
+              </div>
             ))}
           </div>
+          <Link href="/notifications" className={styles.viewAll} onClick={() => setOpen(false)}>
+            عرض كل الإشعارات{data.total > data.items.length ? ` (${data.total})` : ""}
+          </Link>
         </div>
       )}
     </div>

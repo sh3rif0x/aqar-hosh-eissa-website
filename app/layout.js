@@ -2,6 +2,8 @@ import { Cairo } from "next/font/google";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { AuthProvider } from "@/lib/AuthContext";
+import Tracker from "@/components/Tracker";
+import BlockGuard from "@/components/BlockGuard";
 import "./globals.css";
 
 const font = Cairo({ subsets: ["arabic", "latin"], weight: ["400", "500", "600", "700", "800"] });
@@ -15,6 +17,8 @@ export default function RootLayout({ children }) {
   return (
     <html lang="ar" dir="rtl">
       <body className={font.className}>
+        <BlockGuard />
+        <Tracker />
         <AuthProvider>
           <Navbar />
           {children}

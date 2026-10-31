@@ -34,3 +34,13 @@
   .panel { position: fixed; top: 64px; left: 8px; right: 8px; width: auto; }
   .menu { width: auto; }
 }
+
+/* روابط الإشعارات الديناميكية */
+.sender { display: flex; align-items: center; gap: .45rem; color: #1f4d43; font-size: .82rem; font-weight: 700; text-decoration: none; margin-bottom: .25rem; }
+.sender:hover { text-decoration: underline; }
+.sAv { flex: none; width: 24px; height: 24px; border-radius: 50%; background: #1b3a33 center/cover; color: #fff; display: grid; place-items: center; font-size: .7rem; font-style: normal; }
+.itemLink { display: inline-block; margin-top: .25rem; color: #1f4d43; font-size: .8rem; text-decoration: none; }
+.itemLink:hover { text-decoration: underline; }
+.viewAll { display: block; text-align: center; padding: .75rem; border-top: 1px solid #e4e0d6; color: #1f4d43; font-weight: 700; text-decoration: none; }
+.viewAll:hover { background: #f6faf8; }
+div.item { cursor: pointer; }
