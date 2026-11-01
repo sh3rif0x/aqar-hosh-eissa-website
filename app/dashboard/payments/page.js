@@ -19,7 +19,7 @@ export default function AdminPayments() {
   async function review(id, approve) {
     let note = null;
     if (!approve) { note = window.prompt("سبب الرفض (يظهر للمستخدم):", ""); if (note === null) return; }
-    else if (!window.confirm("تأكيد وصول التحويل وتفعيل الباقة؟")) return;
+    else if (!window.confirm("تأكيد وصول التحويل وتفعيل الطلب؟")) return;
     setBusy(id);
     const { error } = await supabase.rpc("admin_review_payment", { p_id: id, p_approve: approve, p_note: note });
     setBusy("");
@@ -39,10 +39,15 @@ export default function AdminPayments() {
       <div style={{ display: "grid", gap: 12 }}>
         {items.map((r) => (
           <div key={r.id} style={{ border: "1px solid #e3e7eb", borderRadius: 14, padding: 14 }}>
-            <div><b>{r.user_name || "مستخدم"}</b> — <span dir="ltr">{r.user_phone || "بدون رقم"}</span></div>
-            <div>فاتورة <b>#{r.invoice_no}</b> • رقم الحساب: <code>{r.account_id}</code> • {r.account_type === "broker" ? "سمسار" : "مستخدم"}</div>
+            <div><b>{r.user_name || "مستخدم"}</b> — <span dir="ltr">{r.user_phone || "بدون رقم"}</span> • {r.account_type === "broker" ? "سمسار/مكتب" : "مستخدم"}</div>
+            <div>فاتورة <b>#{r.invoice_no}</b> • رقم الحساب: <code>{r.account_id}</code></div>
+            <div>
+              {r.kind === "feature"
+                ? <>⭐ <b>تمييز إعلان</b> «{r.listing_title || "—"}» لمدة <b>{r.duration_days} يوم</b>{r.listing_id && <> — <a href={`/listing/${r.listing_id}`} target="_blank" rel="noreferrer">عرض</a></>}</>
+                : <>📦 <b>باقة حصة</b>: {r.plan_credits} إعلان</>}
+              {" "}• المبلغ: <b>{r.amount} ج</b>
+            </div>
             {r.transferred_at && r.status === "pending" && <div style={{ color: "#0a7d4f", fontWeight: 700 }}>✓ العميل ضغط «حوّلت المبلغ» — راجع واتساب</div>}
-            <div>الباقة: {r.plan_credits} إعلان • المبلغ: <b>{r.amount} ج</b></div>
             <small style={{ opacity: .6 }}>{new Date(r.created_at).toLocaleString("ar-EG")}</small>
             {r.admin_note && <div style={{ opacity: .7 }}>ملاحظة: {r.admin_note}</div>}
             {r.status === "pending" && (

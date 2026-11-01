@@ -7,6 +7,7 @@ import { listings, profile } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import { normalize, items } from "@/lib/normalize";
 import AccountTypeBadge from "@/components/AccountTypeBadge";
+import FeatureModal from "@/components/FeatureModal";
 
 const STATUS = { pending: "قيد المراجعة", published: "منشور", rejected: "مرفوض" };
 
@@ -20,6 +21,7 @@ function MyListings() {
   const [quota, setQuota] = useState(null);
   const [office, setOffice] = useState("");
   const [err, setErr] = useState("");
+  const [feat, setFeat] = useState(null);
 
   const load = () => {
     listings.mine({ limit: 50 }).then((d) => setList(items(d))).catch(() => setList([]));
@@ -47,14 +49,14 @@ function MyListings() {
           <p className="ok">🟢 حساب مالك — الإعلانات مجانية وبدون حد. (استخدمت {quota.used})</p>
         ) : (
           <div className="quota">
-            <p>🔵 مكتب — استخدمت <b>{quota.used}</b> من <b>{quota.limit}</b> إعلان (المجاني {quota.free_limit}{quota.extra_ads ? ` + مشترى ${quota.extra_ads}` : ""})</p>
+            <p>{quota.account_type === "broker" ? "🔵 مكتب/سمسار" : "🟢 حساب عادي"} — استخدمت <b>{quota.used}</b> من <b>{quota.limit}</b> إعلان (المجاني {quota.free_limit}{quota.extra_ads ? ` + مشترى ${quota.extra_ads}` : ""})</p>
             <div className="bar-q"><i style={{ width: `${Math.min(100, (quota.used / quota.limit) * 100)}%` }} /></div>
             {quota.remaining <= 0 && (
               <div className="plans">
                 <p className="err">انتهت إعلاناتك المجانية. اشترك لإضافة المزيد:</p>
                 <div><strong>10 إعلانات</strong><span>100 ج.م</span></div>
                 <div><strong>30 إعلان</strong><span>250 ج.م / شهر</span></div>
-                <small>الدفع الإلكتروني سيُفعّل قريباً.</small>
+                {quota.account_type === "broker" && <Link href="/pricing" className="btn">اشترك في باقة</Link>}
               </div>
             )}
           </div>
@@ -73,11 +75,13 @@ function MyListings() {
             <div className="grow"><Link href={`/listing/${l.id}`}><strong>{l.title}</strong></Link>
               <small>{normalize(l).price}</small>{l.status === "rejected" && l.rejection_reason && <small className="rej">سبب الرفض: {l.rejection_reason}</small>}</div>
             <span className={`st st-${l.status}`}>{STATUS[l.status]}</span>
+            {l.status !== "rejected" && <button onClick={() => setFeat(l)} aria-label="ميّز إعلانك" title="ميّز إعلانك الآن">⭐</button>}
             <Link href={`/my-listings/edit/${l.id}`} className="icon-btn" aria-label="تعديل"><Pencil size={16} /></Link>
             <button onClick={() => remove(l.id)} aria-label="حذف"><Trash2 size={16} /></button>
           </div>
         ))}
       </div>
+      <FeatureModal open={!!feat} onClose={() => setFeat(null)} listing={feat} />
     </div></section>
   );
 }

@@ -5,6 +5,7 @@ import { SlidersHorizontal, X, Search } from "lucide-react";
 import { listings, lookups } from "@/lib/api";
 import { normalize, items as toItems } from "@/lib/normalize";
 import PropertyCard from "@/components/PropertyCard";
+import { supabase } from "@/lib/supabase";
 
 const NUMS = ["any", 1, 2, 3, 4, 5];
 const FINISH = [["unfinished", "بدون تشطيب"], ["semi_finished", "نصف تشطيب"], ["fully_finished", "تشطيب كامل"], ["super_lux", "سوبر لوكس"]];
@@ -21,8 +22,10 @@ function Browse() {
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [draft, setDraft] = useState({});
+  const [gk, setGk] = useState({});
 
   const g = (k) => sp.get(k) || "";
+  const grp = g("group");
   const setParam = (k, v) => {
     const p = new URLSearchParams(sp.toString());
     if (v === "" || v == null || v === "any") p.delete(k); else p.set(k, v);
@@ -39,6 +42,11 @@ function Browse() {
 
   useEffect(() => { lookups.all().then(setLk).catch(() => {}); }, []);
   useEffect(() => {
+    supabase.from("categories").select("id,group_kind").then(({ data }) => {
+      const m = {}; (data || []).forEach((c) => { m[c.id] = c.group_kind; }); setGk(m);
+    });
+  }, []);
+  useEffect(() => {
     setDraft({ min: g("min"), max: g("max"), amin: g("amin"), amax: g("amax"), search: g("search") });
   }, [sp]);
 
@@ -51,14 +59,21 @@ function Browse() {
       min_area: num("amin"), max_area: num("amax"), area_unit: g("unit") || null,
       min_rooms: num("rooms"), min_baths: num("baths"), finishing: g("finish") || null,
       advertiser_type: g("by") || null, featured_only: ["1", "true"].includes(g("featured")),
-      sort: g("sort") || "newest", limit: PAGE, offset: page * PAGE,
+      sort: g("sort") || "newest", limit: grp && !g("cat") ? 200 : PAGE, offset: grp && !g("cat") ? 0 : page * PAGE,
     }).then(setData).catch((e) => setError(e.message));
   }, [sp, page]);
 
-  const list = data ? toItems(data).map(normalize) : null;
-  const total = data?.total ?? 0;
-  const active = ["cat", "region", "deal", "min", "max", "search", "amin", "amax", "unit", "rooms", "baths", "finish", "by", "featured"].filter((k) => g(k)).length;
-  const showResidential = !g("cat") || ["1", "2"].includes(g("cat"));
+  const clientGroup = !!grp && !g("cat");
+  const inGroup = (r) => {
+    const kind = gk[r.category_id ?? r.category?.id ?? r.categoryId];
+    return grp === "commercial" ? kind === "commercial" : kind !== "commercial";
+  };
+  const rawAll = data && !(clientGroup && !Object.keys(gk).length) ? toItems(data) : null;
+  const filtered = rawAll && clientGroup ? rawAll.filter(inGroup) : rawAll;
+  const total = clientGroup ? (filtered?.length ?? 0) : (data?.total ?? 0);
+  const list = filtered ? (clientGroup ? filtered.slice(page * PAGE, (page + 1) * PAGE) : filtered).map(normalize) : null;
+  const active = ["group", "cat", "region", "deal", "min", "max", "search", "amin", "amax", "unit", "rooms", "baths", "finish", "by", "featured"].filter((k) => g(k)).length;
+  const showResidential = grp !== "commercial" && (!g("cat") || ["1", "2"].includes(g("cat")));
 
   const Chips = ({ k, options, all = "الكل" }) => (
     <div className="chips">
@@ -90,6 +105,14 @@ function Browse() {
         </form>
       </div>
 
+      <div className="fg"><label>القسم</label>
+        <div className="chips">
+          {[["", "الكل"], ["residential", "سكني"], ["commercial", "تجاري"]].map(([v, l]) => (
+            <button key={v} className={grp === v ? "on" : ""} onClick={() => setMany({ group: v, cat: "" })}>{l}</button>
+          ))}
+        </div>
+      </div>
+
       <div className="fg"><label>نوع الإعلان</label>
         <Chips k="deal" options={[["sale", "للبيع"], ["rent", "للإيجار"]]} />
       </div>
@@ -104,7 +127,7 @@ function Browse() {
       <div className="fg"><label>نوع العقار</label>
         <div className="chips">
           <button className={!g("cat") ? "on" : ""} onClick={() => setParam("cat", "")}>الكل</button>
-          {lk.categories.map((c) => <button key={c.id} className={g("cat") === String(c.id) ? "on" : ""} onClick={() => setParam("cat", c.id)}>{c.name_ar}</button>)}
+          {lk.categories.filter((c) => !grp || (grp === "commercial" ? gk[c.id] === "commercial" : gk[c.id] !== "commercial")).map((c) => <button key={c.id} className={g("cat") === String(c.id) ? "on" : ""} onClick={() => setParam("cat", c.id)}>{c.name_ar}</button>)}
         </div>
       </div>
 
@@ -139,7 +162,9 @@ function Browse() {
     </aside>
   );
 
-  const title = g("deal") === "rent" ? "عقارات للإيجار" : g("deal") === "sale" ? "عقارات للبيع" : "جميع العقارات";
+  const kindWord = grp === "commercial" ? "تجارية" : grp === "residential" ? "سكنية" : "";
+  const dealWord = g("deal") === "rent" ? "للإيجار" : g("deal") === "sale" ? "للبيع" : "";
+  const title = !kindWord && !dealWord ? "جميع العقارات" : `عقارات ${kindWord} ${dealWord}`.replace(/\s+/g, " ").trim();
 
   return (
     <section className="section" style={{ minHeight: "70vh" }}>

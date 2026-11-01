@@ -10,7 +10,7 @@ export default function CtaBanner() {
         <div className="actions">
           <Link href="/add-listing" className="btn"><Plus size={15} /> أضف إعلانك مجاناً</Link>
           <Link href="/browse" className="btn btn-ghost-light">جميع العقارات</Link>
-          <Link href="/commercial" className="btn btn-ghost-light">تجاري</Link>
+          <Link href="/browse?group=commercial" className="btn btn-ghost-light">تجاري</Link>
         </div>
       </div>
     </section>

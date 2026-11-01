@@ -1,4 +1,3 @@
-import FeaturedSection from "@/components/FeaturedSection";
 import Hero from "@/components/Hero";
 import SearchBox from "@/components/SearchBox";
 import About from "@/components/About";
@@ -17,8 +16,8 @@ export default function HomePage() {
 
         <DbSection eyebrow="شراء" title="عقارات للبيع" filters={{ deal_type: "sale" }} href="/browse?deal=sale" alt />
        <DbSection eyebrow="إيجار" title="عقارات للإيجار" filters={{ deal_type: "rent" }} href="/browse?deal=rent" />
-<FeaturedSection />
-      <DbSection eyebrow="إيجار" title="عقارات تجاري" filters={{ deal_type: "rent" }} href="/commercial" />
+      <DbSection eyebrow="مميز" title="⭐ عقارات مميزة" filters={{ featured_only: true }} href="/browse?featured=1" />
+      <DbSection eyebrow="إيجار" title="عقارات تجاري" filters={{ deal_type: "rent" }} href="/browse?group=commercial" />
 
       <About />
       <Trust />

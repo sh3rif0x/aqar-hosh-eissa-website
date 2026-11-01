@@ -7,6 +7,7 @@ import { listings, favorites } from "@/lib/api";
 import { normalize } from "@/lib/normalize";
 import { useAuth } from "@/lib/AuthContext";
 import { waLink } from "@/components/PropertyCard";
+import FeatureButton from "@/components/FeatureButton";
 
 import { ShareTrigger, ReportTrigger, InquiryForm } from "@/components/ListingActions";
 export default function ListingPage({ params }) {
@@ -68,6 +69,21 @@ export default function ListingPage({ params }) {
             <><h3 className="d-sub">التفاصيل</h3>
               <div className="d-rows">{rows.map(([k, v]) => <div key={k}><span>{k}</span><strong>{v}</strong></div>)}</div></>
           )}
+          {(p.location || (raw.lat != null && raw.lng != null)) && (() => {
+            const has = raw.lat != null && raw.lng != null;
+            const q = has ? `${raw.lat},${raw.lng}` : `${p.location}, مصر`;
+            return (
+              <>
+                <h3 className="d-sub">الموقع</h3>
+                {p.location && <p className="d-desc"><MapPin size={15} style={{ verticalAlign: "-2px" }} /> {p.location}</p>}
+                <iframe title="موقع العقار" loading="lazy" allowFullScreen referrerPolicy="no-referrer-when-downgrade"
+                  style={{ width: "100%", height: 340, border: 0, borderRadius: 16, display: "block" }}
+                  src={`https://maps.google.com/maps?q=${encodeURIComponent(q)}&z=${has ? 16 : 13}&hl=ar&output=embed`} />
+                {!has && <small className="hint" style={{ display: "block", marginTop: 6 }}>الموقع تقريبي حسب المنطقة — لم يحدد المعلن العقار بدقة على الخريطة.</small>}
+                <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`} target="_blank" rel="noopener noreferrer" className="btn full" style={{ marginTop: 10 }}>📍 افتح الموقع في خرائط جوجل</a>
+              </>
+            );
+          })()}
         </div>
 
         <aside className="d-side">
@@ -79,6 +95,7 @@ export default function ListingPage({ params }) {
           <a className="btn full" href={`tel:${p.phone}`}><Phone size={16} /> اتصل الآن</a>
           <a className="btn btn-wa full" href={waLink(p.phone, p.title)} target="_blank" rel="noreferrer"><MessageCircle size={16} /> واتساب</a>
           {isMine && <Link href={`/my-listings/edit/${id}`} className="btn btn-outline full"><Pencil size={15} /> تعديل الإعلان</Link>}
+          {isMine && raw.status !== "rejected" && <FeatureButton listingId={id} title={p.title} style={{ marginTop: 8 }} />}
           {isMine && raw.status !== "published" && <p className="warn">هذا الإعلان {raw.status === "pending" ? "قيد المراجعة" : "مرفوض"} ولا يظهر للزوار.</p>}
           <InquiryForm />
 <div className="d-actions">

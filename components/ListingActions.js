@@ -23,7 +23,7 @@ const pageImage = () => {
 const ERR = {
   unauthenticated: "سجّل دخولك أولاً", blocked: "حسابك محظور", own_listing: "لا يمكنك مراسلة نفسك على إعلانك",
   listing_not_found: "الإعلان غير متاح", name_required: "اكتب اسمك", message_required: "اكتب رسالة لا تقل عن 5 أحرف",
-  invalid_phone: "رقم الموبايل غير صحيح", rate_limited: "أرسلت رسائل كثيرة، حاول لاحقاً",
+  phone_required: "رقم الموبايل مطلوب", invalid_phone: "رقم الموبايل غير صحيح", rate_limited: "أرسلت رسائل كثيرة، حاول لاحقاً",
 };
 const errText = (e) => ERR[e?.message] || "حدث خطأ، حاول مرة أخرى";
 
@@ -176,7 +176,7 @@ export function InquiryForm() {
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const submit = async (e) => {
     e.preventDefault(); setBusy(true); setErr("");
-    const { error } = await supabase.rpc("send_listing_inquiry", { p_listing_id: id, p_name: f.name, p_phone: f.phone || null, p_message: f.message });
+    const { error } = await supabase.rpc("send_listing_inquiry", { p_listing_id: id, p_name: f.name, p_phone: f.phone, p_message: f.message });
     setBusy(false);
     if (error) return setErr(errText(error));
     setSent(true);
@@ -192,7 +192,7 @@ export function InquiryForm() {
       ) : (
         <form onSubmit={submit} className={styles.form}>
           <label>الاسم<input required minLength={2} maxLength={80} className={styles.in} value={f.name} onChange={set("name")} /></label>
-          <label>رقم الموبايل (اختياري)<input type="tel" inputMode="tel" dir="ltr" className={styles.in} value={f.phone} onChange={set("phone")} placeholder="01XXXXXXXXX" /></label>
+          <label>رقم الموبايل <b style={{ color: "#c0392b" }}>*</b><input type="tel" inputMode="tel" dir="ltr" required minLength={8} pattern="[+0-9 ]{8,16}" title="اكتب رقم موبايل صحيح" className={styles.in} value={f.phone} onChange={set("phone")} placeholder="01XXXXXXXXX" /></label>
           <label>الرسالة *<textarea required minLength={5} maxLength={1000} rows={3} className={styles.in} value={f.message} onChange={set("message")} /></label>
           {err && <p className={styles.err}>{err}</p>}
           <button className={styles.primary} disabled={busy}>{busy ? "جارٍ الإرسال..." : "إرسال الاستفسار"}</button>

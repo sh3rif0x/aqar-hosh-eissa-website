@@ -49,7 +49,7 @@ export default function UpgradePopup({ open, onClose, mode = "quota" }) {
     const { error } = await supabase.rpc("request_payment", { p_credits: credits });
     setBusy(null);
     if (error) return setErr("تعذر إنشاء الطلب، حاول مرة أخرى");
-    router.push("/pricing");
+    router.push("/pay");
   }
   const q = mode === "quota";
   const best = b?.plans?.length > 1 ? b.plans[b.plans.length - 1].credits : null;

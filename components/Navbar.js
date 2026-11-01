@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { auth } from "@/lib/api";
 
 import HeaderActions from "@/components/HeaderActions";
+import PricingNav from "@/components/PricingNav";
 import Image from "next/image";
 export default function Navbar() {
   const { user, me, isAdmin, loading } = useAuth();
@@ -24,6 +25,7 @@ export default function Navbar() {
         <Link href="/" className="logo"><Image src="/logo.png" alt="عقار حوش عيسى" width={56} height={56} priority style={{ display: "block", height: "56px", width: "auto" }} /></Link>
         <nav className="nav-links">
           {NAV_LINKS.map((l, i) => <Link key={l.href} href={l.href} className={i === 0 ? "active" : ""}>{l.label}</Link>)}
+          <PricingNav />
         </nav>
         <div className="nav-actions">
           

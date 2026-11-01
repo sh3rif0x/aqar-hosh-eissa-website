@@ -1,4 +1,5 @@
 "use client";
+import PricingLink from "@/components/PricingLink";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -162,6 +163,7 @@ export function UserMenu() {
           <Link href="/profile" onClick={() => setOpen(false)} role="menuitem"><UserCog size={16} /> الحساب الشخصي</Link>
           {isAdmin && <Link href="/dashboard/admin" onClick={() => setOpen(false)} role="menuitem"><ShieldCheck size={16} /> لوحة الإدارة</Link>}
           <Link href="/my-listings" onClick={() => setOpen(false)} role="menuitem"><LayoutDashboard size={16} /> إعلاناتي</Link>
+          <PricingLink onClick={() => setOpen(false)} />
 <Link href="/favorites" onClick={() => setOpen(false)} role="menuitem"><LayoutDashboard size={16} /> المفضلة</Link>
 {(isAdmin || me?.account_type === "owner" || me?.account_type === "broker") && (
             <Link href="/dashboard" onClick={() => setOpen(false)} role="menuitem"><LayoutDashboard size={16} /> لوحة المعلن</Link>

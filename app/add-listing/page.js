@@ -89,16 +89,57 @@ export default function AddListing() {
     let dead = false;
     (async () => {
       const L = (await import("leaflet")).default;
-      if (dead || !mapEl.current || mapRef.current) return;
-      const m = L.map(mapEl.current).setView([30.9, 30.2], 9);
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(m);
-      m.on("click", (e) => {
-        const { lat, lng } = e.latlng;
-        if (markerRef.current) markerRef.current.setLatLng(e.latlng);
-        else markerRef.current = L.circleMarker(e.latlng, { radius: 9, color: "#b8731f", fillOpacity: 0.8 }).addTo(m);
-        setF((x) => ({ ...x, lat, lng }));
-      });
-      mapRef.current = m;
+ if (dead || !mapEl.current || mapRef.current) return;
+ const m = L.map(mapEl.current).setView([30.96, 30.31], 12);
+ const street = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" });
+ const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 20, maxNativeZoom: 17, attribution: "© Esri" });
+ const labels = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 });
+ const google = L.tileLayer("https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&hl=ar", { subdomains: "0123", maxZoom: 21, attribution: "© Google" });
+ const hybrid = L.layerGroup([sat, labels]);
+ const streetNames = L.layerGroup([street, L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 })]);
+ google.addTo(m);
+ L.control.layers({ "قمر صناعي (جوجل)": google, "قمر صناعي + أسماء": hybrid, "خريطة + أسماء": streetNames, "خريطة عادية": street }, null, { position: "topright" }).addTo(m);
+ const place = (latlng, zoom) => {
+ if (markerRef.current) markerRef.current.setLatLng(latlng);
+ else {
+ markerRef.current = L.marker(latlng, { draggable: true, icon: L.divIcon({
+ className: "",
+ iconSize: [34, 44],
+ iconAnchor: [17, 44],
+ html: '<svg width="34" height="44" viewBox="0 0 34 44" xmlns="http://www.w3.org/2000/svg" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))"><path d="M17 43C17 43 2 26 2 16.5 2 8 8.7 1.5 17 1.5S32 8 32 16.5C32 26 17 43 17 43Z" fill="#d93025" stroke="#fff" stroke-width="2.5"/><circle cx="17" cy="16.5" r="6" fill="#fff"/></svg>'
+ }) }).addTo(m);
+ markerRef.current.on("dragend", () => { const q = markerRef.current.getLatLng(); setF((x) => ({ ...x, lat: q.lat, lng: q.lng })); });
+ }
+ setF((x) => ({ ...x, lat: latlng.lat, lng: latlng.lng }));
+ if (zoom) m.setView(latlng, zoom);
+ };
+ m.on("click", (e) => place(e.latlng));
+ const Search = L.Control.extend({
+ onAdd() {
+ const d = L.DomUtil.create("div", "");
+ d.style.cssText = "background:#fff;padding:6px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.25);display:flex;gap:4px;direction:rtl";
+ d.innerHTML = '<input id="mapq" placeholder="ابحث عن قرية أو شارع أو معلم" style="border:1px solid #ccc;border-radius:6px;padding:6px;width:190px"/><button id="mapgo" type="button" style="border:0;background:#b8731f;color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer">بحث</button><button id="mapme" type="button" title="موقعي الحالي" style="border:0;background:#2b6cb0;color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer">📍</button>';
+ L.DomEvent.disableClickPropagation(d);
+ const q = d.querySelector("#mapq");
+ const go = async () => {
+ if (!q.value.trim()) return;
+ try {
+ const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=eg&accept-language=ar&viewbox=30.15,31.10,30.50,30.82&q=" + encodeURIComponent(q.value));
+ const j = await r.json();
+ if (j[0]) place(L.latLng(+j[0].lat, +j[0].lon), 17); else alert("ما لقيتش المكان، جرّب اسم تاني");
+ } catch (_) { alert("تعذر البحث، حاول مرة أخرى"); }
+ };
+ d.querySelector("#mapgo").onclick = go;
+ q.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); go(); } });
+ d.querySelector("#mapme").onclick = () => {
+ if (!navigator.geolocation) return alert("المتصفح لا يدعم تحديد الموقع");
+ navigator.geolocation.getCurrentPosition((pos) => place(L.latLng(pos.coords.latitude, pos.coords.longitude), 18), () => alert("ما قدرتش أحدد موقعك، اسمح للمتصفح بالوصول للموقع"));
+ };
+ return d;
+ },
+ });
+ m.addControl(new Search({ position: "topleft" }));
+ mapRef.current = m;
     })();
     return () => { dead = true; mapRef.current?.remove(); mapRef.current = null; markerRef.current = null; };
   }, [allowed]);
@@ -124,6 +165,7 @@ export default function AddListing() {
     if (!f.area || Number(f.area) <= 0) return setErr("اكتب المساحة");
     if (!f.region_id) return setErr("اختر المنطقة");
     if (quota && quota.remaining <= 0) { if (quota.account_type === "broker") setShowUp(true); else setErr(quotaMsg(quota)); return; }
+    if (f.lat == null || f.lng == null) return setErr("حدد موقع العقار بدقة: اضغط على الخريطة وضع الدبوس على مكان العقار");
     if (!phone) return setErr("رقم الموبايل غير صحيح (مثال: 01012345678)");
     if (files.length < 1) return setErr("أضف صورة واحدة على الأقل");
     setBusy(true);
@@ -225,7 +267,7 @@ export default function AddListing() {
             <option value="">اختر المنطقة</option>{regions.map((r) => <option key={r.id} value={r.id}>{r.name_ar}</option>)}
           </select>
           <div ref={mapEl} className={s.map} />
-          <small>{f.lat ? "تم تحديد الموقع ✓" : "اضغط على الخريطة لتحديد موقع العقار"}</small>
+          <small>{f.lat ? "تم تحديد الموقع ✓" : "اضغط على الخريطة لتحديد موقع العقار بدقة (مطلوب) *"}</small>
         </section>
         <section className={s.card}>
           <h2>الوصف</h2>
