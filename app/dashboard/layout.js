@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Activity, Gauge, Users, Building2, Tags, MapPin, ShieldCheck, Flag,
-  Bell, BarChart3, Settings, ScrollText, LogOut, Menu, X, ChevronDown,
+  Bell, BarChart3, Settings, ScrollText, LogOut, Menu, X, ChevronDown, CreditCard,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
@@ -17,6 +17,8 @@ const ADMIN_NAV = [
     items: [["all", "كل المستخدمين"], ["active", "المستخدمون النشطون"], ["blocked", "المحظورون"], ["admins", "المشرفون"]] },
   { key: "listings", label: "الإعلانات", icon: Building2, need: "listings",
     items: [["all", "كل الإعلانات"], ["pending", "بانتظار الموافقة"], ["published", "المنشورة"], ["rejected", "المرفوضة"], ["featured", "المميزة"], ["reported", "المُبلَّغ عنها"]] },
+  { key: "plans", href: "/dashboard/plans", label: "الباقات", icon: CreditCard, need: "users",
+    items: [["overview", "المشتركون"], ["featured", "تمييز الإعلانات"], ["payments", "طلبات الدفع"]] },
   { key: "categories", label: "التصنيفات", icon: Tags, need: "categories",
     items: [["all", "كل التصنيفات"], ["add", "إضافة تصنيف"]] },
   { key: "locations", label: "المواقع", icon: MapPin, need: "locations",

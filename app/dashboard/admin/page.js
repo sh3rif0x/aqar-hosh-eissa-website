@@ -1,4 +1,5 @@
 "use client";
+import AdminFeatureButton from "@/components/AdminFeatureButton";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -24,8 +25,8 @@ const ERR = {
   cannot_block_admin: "فقط Super Admin يستطيع حظر المشرفين", cannot_block_super_admin: "لا يمكن حظر Super Admin",
   admin_has_listings: "لا يمكن حذف مشرف لديه إعلانات، أزل الإشراف عنه بدلاً من ذلك", cannot_delete_self: "لا يمكنك حذف حسابك",
   not_an_admin: "هذا المستخدم ليس مشرفاً", duplicate_name: "الاسم مستخدم من قبل", name_required: "اكتب اسماً صحيحاً",
-  invalid_parent: "الموقع الأب غير صالح", region_has_children: "هذا الموقع يحتوي مناطق تابعة، لا يمكن جعله تابعاً لموقع آخر",
-  reason_required: "اكتب سبب الرفض", listing_not_published: "يمكن تمييز الإعلانات المنشورة فقط", invalid_recipients: "المستلمون غير صالحين",
+  invalid_parent: "الموقع الأب غير صالح", region_in_use: "لا يمكن حذف موقع عليه إعلانات. عطّل الموقع بدل حذفه، أو انقل الإعلانات لموقع آخر", region_has_children: "هذا الموقع يحتوي مناطق تابعة، لا يمكن جعله تابعاً لموقع آخر",
+  reason_required: "اكتب سبب الرفض", category_in_use: "لا يمكن حذف تصنيف عليه إعلانات. عطّل التصنيف بدل حذفه، أو انقل الإعلانات لتصنيف آخر", listing_not_published: "يمكن تمييز الإعلانات المنشورة فقط", invalid_recipients: "المستلمون غير صالحين",
   nothing_to_retry: "لا توجد إشعارات فاشلة لإعادتها", not_scheduled: "الإشعار ليس مجدولاً", invalid_permission: "صلاحية غير معروفة",
 };
 const msg = (e) => ERR[e?.message] || e?.message || "حدث خطأ غير متوقع";
@@ -277,7 +278,7 @@ function Users({ filter, acc, can, toast }) {
                 const canBlock = can("users") && !self && u.role !== "super_admin" && (u.role === "user" || acc.isSuper);
                 return (
                   <tr key={u.id}>
-                    <td><div className={styles.cell}><strong>{u.full_name || "—"}</strong><small>{u.email}</small></div></td>
+                    <td><div className={styles.cell}><Link href={`/profile/${u.id}`} target="_blank" rel="noreferrer"><strong>{u.full_name || "—"}</strong></Link><small>{u.email}</small></div></td>
                     <td>{u.phone || "—"}</td>
                     <td>{badge(ROLE, u.role)}</td>
                     <td>{u.is_blocked ? <span className={cls(styles.badge, styles["bg-bad"])}>محظور</span> : <span className={cls(styles.badge, styles["bg-ok"])}>نشط</span>}</td>
@@ -339,7 +340,7 @@ function Listings({ filter, toast }) {
                 <tr key={l.id}>
                   <td>
                     <div className={styles.row}>
-                      <div className={styles.thumb} style={{ background: l.cover_path ? `url(${l.cover_path}) center/cover` : undefined }} />
+                      <Link href={`/listing/${l.id}`} target="_blank" rel="noreferrer"><div className={styles.thumb} style={{ background: l.cover_path ? `url(${l.cover_path}) center/cover` : undefined }} /></Link>
                       <div className={styles.cell}>
                         <Link href={`/listing/${l.id}`} target="_blank"><strong>{l.title}</strong></Link>
                         <small>{l.category_name_ar} · {l.region_name_ar}</small>
@@ -347,16 +348,16 @@ function Listings({ filter, toast }) {
                       </div>
                     </div>
                   </td>
-                  <td>{l.owner_name}</td>
+                  <td><Link href={`/profile/${l.user_id}`} target="_blank" rel="noreferrer"><strong>{l.owner_name}</strong></Link></td>
                   <td>{fmtPrice(l.price)}</td>
-                  <td>{badge(LSTATUS, l.status)} {l.is_featured && <span className={cls(styles.badge, styles["bg-gold"])}>مميز</span>}</td>
+                  <td>{badge(LSTATUS, l.status)} {l.is_featured && <><span className={cls(styles.badge, styles["bg-gold"])}>مميز</span> <small style={{ display: "block", opacity: .7 }}>{l.featured_until ? "حتى " + new Date(l.featured_until).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" }) : "دائم (بدون تاريخ)"}</small></>}</td>
                   <td>{l.reports_count > 0 ? <span className={cls(styles.badge, styles["bg-bad"])}>{l.reports_count}</span> : "—"}</td>
                   <td>{fmtDay(l.created_at)}</td>
                   <td>
                     <div className={styles.acts}>
                       {l.status !== "published" && <button className={cls(styles.b, styles.bOk)} onClick={() => run(() => rpc("admin_review_listing", { p_id: l.id, p_decision: "approve" }), "تم نشر الإعلان")}>قبول</button>}
                       {l.status !== "rejected" && <button className={cls(styles.b, styles.bDanger)} onClick={() => reject(l)}>رفض</button>}
-                      {l.status === "published" && <button className={styles.b} onClick={() => run(() => rpc("admin_set_featured", { p_id: l.id, p_featured: !l.is_featured }), l.is_featured ? "أُلغي التمييز" : "تم التمييز")}>{l.is_featured ? "إلغاء التمييز" : "تمييز"}</button>}
+                      {l.status === "published" && <AdminFeatureButton l={l} className={styles.b} onDone={(msg) => run(() => Promise.resolve(null), msg)} />}
                       <button className={cls(styles.b, styles.bDanger)} onClick={() => del(l)}>حذف</button>
                     </div>
                   </td>
@@ -385,6 +386,11 @@ function Categories({ mode, toast }) {
       toast("تم الحفظ"); reload(); done?.();
     } catch (e) { toast(msg(e), "err"); }
   };
+  const del = async (c) => {
+    if (!window.confirm(`حذف تصنيف «${c.name_ar}» نهائيًا؟`)) return;
+    try { await rpc("admin_delete_category", { p_id: c.id }); toast("تم حذف التصنيف"); reload(); }
+    catch (e) { toast(msg(e), "err"); }
+  };
   const form = (init, done) => <CategoryForm key={init.id ?? "new"} init={init} onSave={(f) => save(f, done)} onCancel={done} />;
   return (
     <>
@@ -404,6 +410,7 @@ function Categories({ mode, toast }) {
                     <td><div className={styles.acts}>
                       <button className={styles.b} onClick={() => setEdit(c)}>تعديل</button>
                       <button className={cls(styles.b, c.is_active ? styles.bDanger : styles.bOk)} onClick={() => save({ ...c, is_active: !c.is_active })}>{c.is_active ? "تعطيل" : "تفعيل"}</button>
+                      <button className={cls(styles.b, styles.bDanger)} onClick={() => del(c)}>حذف</button>
                     </div></td>
                   </tr>
                 ))}
@@ -451,6 +458,11 @@ function Locations({ mode, toast }) {
   const rows = (st.data || []).filter((r) => (mode === "villages" ? r.parent_id : true));
   const form = (init, done) => <RegionForm key={init.id ?? "new"} init={init} parents={parents.filter((p) => p.id !== init.id)} onSave={(f) => save(f, done)} onCancel={done} />;
   const titles = { all: "كل المواقع", add: "إضافة موقع جديد", villages: "القرى والمناطق" };
+  const del = async (r) => {
+    if (!window.confirm(`حذف موقع «${r.name_ar}» نهائيًا؟`)) return;
+    try { await rpc("admin_delete_region", { p_id: r.id }); toast("تم حذف الموقع"); reload(); }
+    catch (e) { toast(msg(e), "err"); }
+  };
   return (
     <>
       <Head title={titles[mode] || titles.all} sub="يمكن ربط القرية أو المنطقة بموقع رئيسي، وتعطيل أي موقع بدل حذفه" />
@@ -470,6 +482,7 @@ function Locations({ mode, toast }) {
                       <td><div className={styles.acts}>
                         <button className={styles.b} onClick={() => setEdit(r)}>تعديل</button>
                         <button className={cls(styles.b, r.is_active ? styles.bDanger : styles.bOk)} onClick={() => save({ ...r, is_active: !r.is_active })}>{r.is_active ? "تعطيل" : "تفعيل"}</button>
+                      <button className={cls(styles.b, styles.bDanger)} onClick={() => del(r)}>حذف</button>
                       </div></td>
                     </tr>
                   ))}
@@ -548,7 +561,7 @@ function Admins({ mode, acc, toast }) {
                 const self = a.id === acc.me.id;
                 return (
                   <tr key={a.id}>
-                    <td><div className={styles.cell}><strong>{a.full_name || "—"}{self ? " (أنت)" : ""}</strong><small>{a.email}</small></div></td>
+                    <td><div className={styles.cell}><Link href={`/profile/${a.id}`} target="_blank" rel="noreferrer"><strong>{a.full_name || "—"}{self ? " (أنت)" : ""}</strong></Link><small>{a.email}</small></div></td>
                     <td>{badge(ROLE, a.role)}</td>
                     <td>{a.is_blocked ? <span className={cls(styles.badge, styles["bg-bad"])}>محظور</span> : <span className={cls(styles.badge, styles["bg-ok"])}>نشط</span>}</td>
                     <td>{a.role === "super_admin" ? "كاملة" : `${a.perms.length} من ${Object.keys(PERMS).length}`}</td>
@@ -610,8 +623,8 @@ function Reports({ kind, can, toast }) {
             {st.data?.items.map((r) => (
               <tr key={r.id}>
                 <td><div className={styles.cell}><strong>{r.reason}</strong>{r.details && <small>{r.details}</small>}{r.resolution_note && <small>ملاحظة: {r.resolution_note}</small>}</div></td>
-                <td>{r.reporter_name || "—"}</td>
-                <td>{r.kind === "listing" ? <Link href={`/listing/${r.listing_id}`} target="_blank">{r.listing_title || "إعلان محذوف"}</Link> : r.target_name || "—"}</td>
+                <td>{r.reporter_id ? <Link href={`/profile/${r.reporter_id}`} target="_blank" rel="noreferrer">{r.reporter_name || "—"}</Link> : (r.reporter_name || "—")}</td>
+                <td>{r.kind === "listing" ? <Link href={`/listing/${r.listing_id}`} target="_blank">{r.listing_title || "إعلان محذوف"}</Link> : r.target_user_id ? <Link href={`/profile/${r.target_user_id}`} target="_blank" rel="noreferrer">{r.target_name || "—"}</Link> : (r.target_name || "—")}</td>
                 <td>{badge({ open: ["مفتوح", "bg-warn"], resolved: ["تمت المعالجة", "bg-ok"], dismissed: ["مرفوض", ""] }, r.status)}</td>
                 <td>{fmtDay(r.created_at)}</td>
                 <td><div className={styles.acts}>
@@ -751,7 +764,7 @@ function NotificationList({ scope, toast }) {
             <thead><tr><th>المستلم</th><th>الحالة</th><th>ملاحظة</th></tr></thead>
             <tbody>{detail.recipients.map((r) => (
               <tr key={r.user_id}>
-                <td><div className={styles.cell}><strong>{r.name || "—"}</strong><small>{r.email}</small></div></td>
+                <td><div className={styles.cell}><Link href={`/profile/${r.user_id}`} target="_blank" rel="noreferrer"><strong>{r.name || "—"}</strong></Link><small>{r.email}</small></div></td>
                 <td>{r.status === "sent" ? "✅ تم" : r.status === "failed" ? "❌ فشل" : "⏳ بانتظار"}</td>
                 <td>{r.error === "user_blocked" ? "المستخدم محظور" : r.read_at ? "تمت القراءة" : "—"}</td>
               </tr>))}</tbody></table></div>
@@ -802,7 +815,7 @@ function Logs() {
           <tbody>
             {st.data?.items.map((l, i) => (
               <tr key={i}>
-                <td>{fmtDate(l.created_at)}</td><td>{l.actor_name || "—"}</td><td>{ACTION[l.action] || l.action}</td>
+                <td>{fmtDate(l.created_at)}</td><td>{l.actor_name || "—"}</td><td>{ACTION[l.action] || l.action}{(l.entity === "listing" || l.entity === "user") && l.entity_id && <> <Link href={l.entity === "listing" ? `/listing/${l.entity_id}` : `/profile/${l.entity_id}`} target="_blank" rel="noreferrer">↗ فتح</Link></>}</td>
                 <td><small>{l.details?.note || (l.details?.to ? `${l.details.from} ← ${l.details.to}` : l.details?.name || l.details?.audience || "")}</small></td>
               </tr>
             ))}

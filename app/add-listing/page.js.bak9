@@ -1,0 +1,301 @@
+"use client";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/AuthContext";
+import { VODA, WA } from "@/lib/payment";
+import { uploadToCloudinary } from "@/lib/cloudinary";
+import "leaflet/dist/leaflet.css";
+import s from "./add.module.css";
+import UpgradePopup from "@/components/UpgradePopup";
+
+const FEATURES = [["gas","غاز"],["water","مياه"],["electricity","كهرباء"],["wifi","واي فاي"],["elevator","أسانسير"],["parking","جراج"]];
+const DURATIONS = [30, 60, 90, 180, 365];
+const FINISH = [["unfinished","على الطوب"],["semi_finished","نصف تشطيب"],["fully_finished","تشطيب كامل"],["super_lux","سوبر لوكس"]];
+const FURN = [["furnished","مفروش"],["semi_furnished","نصف مفروش"],["unfurnished","بدون فرش"]];
+const UNITS = [["sqm","م²"],["feddan","فدان"],["qirat","قيراط"],["sahm","سهم"]];
+const MAX_IMAGES = 8; // الحد الأقصى في الداتابيز
+
+function FeaturedPromo() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    try {
+      const last = Number(localStorage.getItem("promo_seen") || 0);
+      if (Date.now() - last > 48 * 3600 * 1000) setShow(true);
+    } catch { setShow(true); }
+  }, []);
+  if (!show) return null;
+  const close = () => { try { localStorage.setItem("promo_seen", String(Date.now())); } catch {} setShow(false); };
+  return (
+    <div style={{ background: "#fff7e6", border: "1px solid #b8731f", borderRadius: 12, padding: 16, marginBottom: 16, lineHeight: 1.9 }}>
+      <b>⭐ ميّز إعلانك بـ 50 جنيه فقط</b>
+      <p style={{ margin: "8px 0" }}>اجعل إعلانك في الأعلى بشارة «مميز» لمدة 30 يومًا، والدفع بسهولة من صفحة الباقات.</p>
+      <Link href="/pricing" style={{ marginInlineEnd: 12 }}>ميّز إعلانك الآن</Link>
+      <button type="button" onClick={close}>إغلاق</button>
+    </div>
+  );
+}
+
+function normPhone(v) {
+  let d = (v || "").replace(/\D/g, "");
+  if (d.startsWith("0020")) d = d.slice(4);
+  else if (d.startsWith("20")) d = d.slice(2);
+  if (d.startsWith("0")) d = d.slice(1);
+  return /^1[0125]\d{8}$/.test(d) ? "0" + d : null;
+}
+
+function quotaMsg(q) {
+  if (q?.account_type === "broker")
+    return "انتهت إعلاناتك المجانية. للاستمرار: 10 إعلانات بـ 100 جنيه أو 30 إعلان بـ 250 جنيه. الدفع على فودافون كاش " + VODA + " ثم ابعت السكرين شوت على واتساب.";
+  return "وصلت للحد الأقصى: 5 إعلانات في الشهر للحسابات العادية. لو أنت سمسار أو مكتب عقارات تواصل معنا على واتساب لترقية حسابك.";
+}
+
+export default function AddListing() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const [cats, setCats] = useState([]);
+  const [regions, setRegions] = useState([]);
+  const [allowed, setAllowed] = useState(null);
+  const [quota, setQuota] = useState(null);
+  const [showUp, setShowUp] = useState(false);
+  const [f, setF] = useState({
+    deal_type: "sale", group: "residential", category_id: "", title: "", price: "", area: "", area_unit: "sqm",
+    rooms: "", bathrooms: "", floor: "", finishing: "", furnishing: "", features: [], region_id: "",
+    lat: null, lng: null, description: "", phone: "", duration_days: 30,
+  });
+  const [files, setFiles] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const mapEl = useRef(null), mapRef = useRef(null), markerRef = useRef(null);
+  const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
+
+  useEffect(() => {
+    supabase.from("categories").select("id,slug,name_ar,details_kind,group_kind").eq("is_active", true).order("sort_order").then(({ data, error }) => { if (error) { console.error("categories error:", error); setErr("تعذر تحميل أنواع العقارات: " + error.message); } setCats(data || []); });
+    supabase.from("regions").select("id,name_ar").eq("is_active", true).order("sort_order").then(({ data, error }) => { if (error) { console.error("regions error:", error); setErr("تعذر تحميل المناطق: " + error.message); } setRegions(data || []); });
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.rpc("get_my_quota").then(({ data }) => setQuota(data || null));
+    supabase.rpc("get_my_profile").then(({ data }) => {
+      setAllowed(true);
+      if (data?.phone) setF((x) => ({ ...x, phone: x.phone || data.phone }));
+    });
+  }, [user]);
+
+  useEffect(() => {
+    if (!allowed) return;
+    let dead = false;
+    (async () => {
+      const L = (await import("leaflet")).default;
+ if (dead || !mapEl.current || mapRef.current) return;
+ const m = L.map(mapEl.current).setView([30.96, 30.31], 12);
+ const street = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" });
+ const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 20, maxNativeZoom: 17, attribution: "© Esri" });
+ const labels = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 });
+ const google = L.tileLayer("https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&hl=ar", { subdomains: "0123", maxZoom: 21, attribution: "© Google" });
+ const hybrid = L.layerGroup([sat, labels]);
+ const streetNames = L.layerGroup([street, L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 })]);
+ google.addTo(m);
+ L.control.layers({ "قمر صناعي (جوجل)": google, "قمر صناعي + أسماء": hybrid, "خريطة + أسماء": streetNames, "خريطة عادية": street }, null, { position: "topright" }).addTo(m);
+ const place = (latlng, zoom) => {
+ if (markerRef.current) markerRef.current.setLatLng(latlng);
+ else {
+ markerRef.current = L.marker(latlng, { draggable: true, icon: L.divIcon({
+ className: "",
+ iconSize: [34, 44],
+ iconAnchor: [17, 44],
+ html: '<svg width="34" height="44" viewBox="0 0 34 44" xmlns="http://www.w3.org/2000/svg" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))"><path d="M17 43C17 43 2 26 2 16.5 2 8 8.7 1.5 17 1.5S32 8 32 16.5C32 26 17 43 17 43Z" fill="#d93025" stroke="#fff" stroke-width="2.5"/><circle cx="17" cy="16.5" r="6" fill="#fff"/></svg>'
+ }) }).addTo(m);
+ markerRef.current.on("dragend", () => { const q = markerRef.current.getLatLng(); setF((x) => ({ ...x, lat: q.lat, lng: q.lng })); });
+ }
+ setF((x) => ({ ...x, lat: latlng.lat, lng: latlng.lng }));
+ if (zoom) m.setView(latlng, zoom);
+ };
+ m.on("click", (e) => place(e.latlng));
+ const Search = L.Control.extend({
+ onAdd() {
+ const d = L.DomUtil.create("div", "");
+ d.style.cssText = "background:#fff;padding:6px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.25);display:flex;gap:4px;direction:rtl";
+ d.innerHTML = '<input id="mapq" placeholder="ابحث عن قرية أو شارع أو معلم" style="border:1px solid #ccc;border-radius:6px;padding:6px;width:190px"/><button id="mapgo" type="button" style="border:0;background:#b8731f;color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer">بحث</button><button id="mapme" type="button" title="موقعي الحالي" style="border:0;background:#2b6cb0;color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer">📍</button>';
+ L.DomEvent.disableClickPropagation(d);
+ const q = d.querySelector("#mapq");
+ const go = async () => {
+ if (!q.value.trim()) return;
+ try {
+ const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=eg&accept-language=ar&viewbox=30.15,31.10,30.50,30.82&q=" + encodeURIComponent(q.value));
+ const j = await r.json();
+ if (j[0]) place(L.latLng(+j[0].lat, +j[0].lon), 17); else alert("ما لقيتش المكان، جرّب اسم تاني");
+ } catch (_) { alert("تعذر البحث، حاول مرة أخرى"); }
+ };
+ d.querySelector("#mapgo").onclick = go;
+ q.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); go(); } });
+ d.querySelector("#mapme").onclick = () => {
+ if (!navigator.geolocation) return alert("المتصفح لا يدعم تحديد الموقع");
+ navigator.geolocation.getCurrentPosition((pos) => place(L.latLng(pos.coords.latitude, pos.coords.longitude), 18), () => alert("ما قدرتش أحدد موقعك، اسمح للمتصفح بالوصول للموقع"));
+ };
+ return d;
+ },
+ });
+ m.addControl(new Search({ position: "topleft" }));
+ mapRef.current = m;
+    })();
+    return () => { dead = true; mapRef.current?.remove(); mapRef.current = null; markerRef.current = null; };
+  }, [allowed]);
+
+  const visibleCats = cats.filter((c) => (f.group === "commercial" ? c.group_kind === "commercial" : c.group_kind !== "commercial"));
+  const cat = cats.find((c) => String(c.id) === String(f.category_id));
+  const isRes = cat?.details_kind === "residential";
+
+  const pick = (e) => {
+    const list = [...e.target.files];
+    const ok = list.filter((x) => /^image\/(png|jpe?g)$/.test(x.type) && x.size <= 5 * 1024 * 1024);
+    if (ok.length < list.length) setErr("بعض الصور تم تجاهلها (PNG/JPG وحد أقصى 5 ميجا)");
+    setFiles((p) => [...p, ...ok].slice(0, MAX_IMAGES));
+    e.target.value = "";
+  };
+
+  const submit = async (e) => {
+    e.preventDefault(); setErr("");
+    const phone = normPhone(f.phone);
+    if (!f.category_id) return setErr("اختر نوع العقار");
+    if (f.title.trim().length < 5) return setErr("اكتب عنواناً لا يقل عن 5 أحرف");
+    if (!f.price || Number(f.price) <= 0) return setErr("اكتب السعر");
+    if (!f.area || Number(f.area) <= 0) return setErr("اكتب المساحة");
+    if (!f.region_id) return setErr("اختر المنطقة");
+    if (quota && quota.remaining <= 0) { if (quota.account_type === "broker") setShowUp(true); else setErr(quotaMsg(quota)); return; }
+    if (f.lat == null || f.lng == null) return setErr("حدد موقع العقار بدقة: اضغط على الخريطة وضع الدبوس على مكان العقار");
+    if (!phone) return setErr("رقم الموبايل غير صحيح (مثال: 01012345678)");
+    if (files.length < 1) return setErr("أضف صورة واحدة على الأقل");
+    setBusy(true);
+    try {
+      const { data: l, error } = await supabase.from("listings").insert({
+        user_id: user.id, category_id: Number(f.category_id), region_id: Number(f.region_id), deal_type: f.deal_type,
+        title: f.title.trim(), description: f.description.trim() || null, price: Number(f.price),
+        area: Number(f.area), area_unit: f.area_unit, contact_phone: phone,
+        duration_days: f.duration_days, lat: f.lat, lng: f.lng, furnishing: f.furnishing || null, features: f.features,
+      }).select("id").single();
+      if (error) throw error;
+      if (isRes) {
+        const { error: e2 } = await supabase.from("listing_residential_details").insert({
+          listing_id: l.id, rooms: f.rooms ? Number(f.rooms) : null, bathrooms: f.bathrooms ? Number(f.bathrooms) : null,
+          floor: f.floor !== "" ? Number(f.floor) : null, finishing: f.finishing || null,
+        });
+        if (e2) throw e2;
+      }
+      for (let i = 0; i < files.length; i++) {
+        const url = await uploadToCloudinary(files[i]);
+        const { error: e3 } = await supabase.from("listing_images").insert({ listing_id: l.id, storage_path: url, sort_order: i });
+        if (e3) throw e3;
+      }
+      router.push("/dashboard?added=1");
+    } catch (x) {
+      const m = x?.message || "";
+      setErr(
+        m.includes("owner_monthly_limit") ? quotaMsg({ account_type: "owner" }) :
+        m.includes("quota_exceeded") ? (setShowUp(true), "") :
+        (m || "حدث خطأ، حاول مرة أخرى")
+      );
+      setBusy(false);
+    }
+  };
+
+  if (!user) return <main className={s.wrap} dir="rtl"><p>سجّل دخولك لإضافة إعلان.</p><Link className={s.btn} href="/auth">تسجيل الدخول</Link></main>;
+
+  const Seg = ({ value, onChange, items }) => (
+    <div className={s.seg}>{items.map(([k, l]) => <button type="button" key={k} className={value === k ? s.on : ""} onClick={() => onChange(k)}>{l}</button>)}</div>
+  );
+
+  return (
+    <main className={s.wrap} dir="rtl">
+      <h1>أضف إعلان جديد</h1>
+      <FeaturedPromo />
+      <p className={s.sub}>اعرض عقارك على آلاف المهتمين مجاناً</p>
+      {quota && quota.remaining > 0 && (
+        <p className={s.note}>
+          {quota.remaining > 0
+            ? `متبقي لك ${quota.remaining} من ${quota.limit} إعلان ${quota.period === "month" ? "هذا الشهر" : ""}`
+            : quotaMsg(quota)}
+        </p>
+      )}
+      <form onSubmit={submit}>
+        <section className={s.card}>
+          <h2>نوع العقار</h2>
+          <Seg value={f.deal_type} onChange={(v) => set("deal_type", v)} items={[["sale","للبيع"],["rent","للإيجار"]]} />
+          <Seg value={f.group} onChange={(v) => { set("group", v); set("category_id", ""); }} items={[["residential","سكني"],["commercial","تجاري"]]} />
+          <select className={s.in} value={f.category_id} onChange={(e) => set("category_id", e.target.value)}>
+            <option value="">اختر النوع</option>
+            {visibleCats.map((c) => <option key={c.id} value={c.id}>{c.name_ar}</option>)}
+          </select>
+        </section>
+        <section className={s.card}>
+          <h2>تفاصيل العقار</h2>
+          <input className={s.in} placeholder="عنوان الإعلان" maxLength={120} value={f.title} onChange={(e) => set("title", e.target.value)} />
+          <div className={s.two}>
+            <input className={s.in} type="number" min="0" placeholder="السعر (جنيه)" value={f.price} onChange={(e) => set("price", e.target.value)} />
+            <div className={s.two}>
+              <input className={s.in} type="number" min="0" step="any" placeholder="المساحة" value={f.area} onChange={(e) => set("area", e.target.value)} />
+              <select className={s.in} value={f.area_unit} onChange={(e) => set("area_unit", e.target.value)}>{UNITS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+            </div>
+          </div>
+          {isRes && (<>
+            <div className={s.three}>
+              <input className={s.in} type="number" min="0" placeholder="عدد الغرف" value={f.rooms} onChange={(e) => set("rooms", e.target.value)} />
+              <input className={s.in} type="number" min="0" placeholder="الحمامات" value={f.bathrooms} onChange={(e) => set("bathrooms", e.target.value)} />
+              <input className={s.in} type="number" placeholder="الدور" value={f.floor} onChange={(e) => set("floor", e.target.value)} />
+            </div>
+            <select className={s.in} value={f.finishing} onChange={(e) => set("finishing", e.target.value)}>
+              <option value="">اختر التشطيب</option>{FINISH.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+          </>)}
+          <select className={s.in} value={f.furnishing} onChange={(e) => set("furnishing", e.target.value)}>
+            <option value="">اختر حالة الفرش</option>{FURN.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
+          <h3>المميزات والخدمات</h3>
+          <div className={s.chips}>
+            {FEATURES.map(([k, l]) => (
+              <label key={k} className={f.features.includes(k) ? s.chip + " " + s.on : s.chip}>
+                <input type="checkbox" hidden checked={f.features.includes(k)} onChange={() => set("features", f.features.includes(k) ? f.features.filter((x) => x !== k) : [...f.features, k])} />{l}
+              </label>
+            ))}
+          </div>
+        </section>
+        <section className={s.card}>
+          <h2>الموقع</h2>
+          <select className={s.in} value={f.region_id} onChange={(e) => set("region_id", e.target.value)}>
+            <option value="">اختر المنطقة</option>{regions.map((r) => <option key={r.id} value={r.id}>{r.name_ar}</option>)}
+          </select>
+          <div ref={mapEl} className={s.map} />
+          <small>{f.lat ? "تم تحديد الموقع ✓" : "اضغط على الخريطة لتحديد موقع العقار بدقة (مطلوب) *"}</small>
+        </section>
+        <section className={s.card}>
+          <h2>الوصف</h2>
+          <textarea className={s.in} rows={5} maxLength={500} value={f.description} onChange={(e) => set("description", e.target.value)} />
+          <small>{f.description.length}/500</small>
+        </section>
+        <section className={s.card}>
+          <h2>الصور</h2>
+          <label className={s.btn2}>إضافة صور<input type="file" accept="image/png,image/jpeg" multiple hidden onChange={pick} /></label>
+          <small>{files.length}/{MAX_IMAGES} صور • PNG أو JPG (بحد أقصى 5 ميجابايت للصورة)</small>
+          <div className={s.thumbs}>
+            {files.map((x, i) => (
+              <div key={i} className={s.th}><img src={URL.createObjectURL(x)} alt="" /><button type="button" onClick={() => setFiles(files.filter((_, j) => j !== i))}>×</button></div>
+            ))}
+          </div>
+        </section>
+        <section className={s.card}>
+          <h2>بيانات التواصل</h2>
+          <input className={s.in} dir="ltr" inputMode="tel" placeholder="01012345678" value={f.phone} onChange={(e) => set("phone", e.target.value)} />
+          <small>اكتب رقمك المصري بأي صيغة</small>
+          <h3>مدة الإعلان</h3>
+          <Seg value={f.duration_days} onChange={(v) => set("duration_days", v)} items={DURATIONS.map((d) => [d, d + " يوم"])} />
+        </section>
+        {err && <p className={s.err}>{err}</p>}
+        <p className={s.note}>سيتم مراجعة إعلانك من قبل فريقنا قبل نشره — تستغرق المراجعة عادةً 24 ساعة</p>
+        <button className={s.btn} disabled={busy || (quota && quota.account_type !== "broker" && quota.remaining <= 0)}>{busy ? "جارٍ النشر..." : "نشر الإعلان"}</button>
+      </form>
+      <UpgradePopup open={showUp} onClose={() => setShowUp(false)} mode="quota" />
+    </main>
+  );
+}

@@ -8,6 +8,10 @@ import { normalize } from "@/lib/normalize";
 import { useAuth } from "@/lib/AuthContext";
 import { waLink } from "@/components/PropertyCard";
 import FeatureButton from "@/components/FeatureButton";
+import AdvertiserLink from "@/components/AdvertiserLink";
+import AdminFeatureButton from "@/components/AdminFeatureButton";
+import { supabase } from "@/lib/supabase";
+import { arErr } from "@/lib/arabic";
 
 import { ShareTrigger, ReportTrigger, InquiryForm } from "@/components/ListingActions";
 export default function ListingPage({ params }) {
@@ -17,6 +21,12 @@ export default function ListingPage({ params }) {
   const [raw, setRaw] = useState(undefined);
   const [img, setImg] = useState(0);
   const [fav, setFav] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    supabase.rpc("get_my_profile").then(({ data }) => setIsAdmin(["admin", "super_admin"].includes(data?.role))).catch(() => {});
+  }, [user]);
 
   useEffect(() => {
     listings.get(id).then((d) => { setRaw(d); setFav(!!d?.is_favorite); }).catch(() => setRaw(null));
@@ -29,6 +39,29 @@ export default function ListingPage({ params }) {
   const isMine = user && raw.user_id === user.id;
   const images = (raw.images || []).map((i) => i.storage_path);
   const d = raw.details || {};
+
+  const A_STATUS = { pending: "قيد المراجعة", published: "منشور", rejected: "مرفوض" };
+  const fmtDT = (v) => (v ? new Date(v).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" }) : "—");
+  const reloadRaw = () => listings.get(id).then((x) => setRaw(x)).catch(() => {});
+  const aRun = async (fn, okMsg, confirmText, after) => {
+    if (confirmText && !window.confirm(confirmText)) return;
+    setBusy(true);
+    try { await fn(); alert(okMsg); if (after) after(); else await reloadRaw(); }
+    catch (e) { alert(arErr(e)); }
+    finally { setBusy(false); }
+  };
+  const aApprove = () => aRun(async () => {
+    const { error } = await supabase.rpc("admin_review_listing", { p_id: id, p_decision: "approve" }); if (error) throw error;
+  }, "تم نشر الإعلان");
+  const aReject = () => {
+    const r = window.prompt("سبب الرفض (سيظهر للمعلن):");
+    if (r && r.trim()) aRun(async () => {
+      const { error } = await supabase.rpc("admin_review_listing", { p_id: id, p_decision: "reject", p_reason: r.trim() }); if (error) throw error;
+    }, "تم رفض الإعلان");
+  };
+  const aDelete = () => aRun(async () => {
+    const { error } = await supabase.from("listings").delete().eq("id", id); if (error) throw error;
+  }, "تم حذف الإعلان", "حذف الإعلان نهائيًا؟", () => router.push("/dashboard/admin"));
 
   const toggleFav = async () => {
     if (!user) return router.push("/auth?reason=favorite");
@@ -88,10 +121,28 @@ export default function ListingPage({ params }) {
 
         <aside className="d-side">
           <p className="price big">{p.price} {p.period && <small>{p.period}</small>}</p>
-          <div className="d-adv">
-            <span className="avatar">{p.agent.name[0]}</span>
-            <div><strong>{p.agent.name}</strong><div><em className={p.agent.isBroker ? "tag-broker" : "tag-owner"}>{p.agent.isBroker ? "🔵" : "🟢"} {p.agent.role}</em></div></div>
-          </div>
+          <AdvertiserLink side />
+          {isAdmin && (
+            <div style={{ border: "2px solid #0a7d4f", borderRadius: 14, padding: 12, margin: "10px 0", display: "grid", gap: 8, background: "#f4fbf7" }}>
+              <b style={{ color: "#0a7d4f" }}>🛡️ لوحة الإدارة</b>
+              <div style={{ fontSize: 13, display: "grid", gap: 4 }}>
+                <div>الحالة: <b>{A_STATUS[raw.status] || raw.status}</b></div>
+                <div>رقم الإعلان: <code dir="ltr" style={{ fontSize: 11, wordBreak: "break-all" }}>{raw.id}</code></div>
+                <div>صاحب الإعلان: <Link href={`/profile/${raw.user_id}`} target="_blank" rel="noreferrer"><b>فتح الملف الشخصي ↗</b></Link></div>
+                <div>تاريخ الإنشاء: {fmtDT(raw.created_at)}</div>
+                {raw.published_at && <div>تاريخ النشر: {fmtDT(raw.published_at)}</div>}
+                {raw.expires_at && <div>ينتهي الإعلان: {fmtDT(raw.expires_at)}</div>}
+                {raw.is_featured && <div>⭐ مميز {raw.featured_until ? `حتى ${fmtDT(raw.featured_until)}` : "(دائم)"}</div>}
+                {raw.status === "rejected" && raw.rejection_reason && <div style={{ color: "#c0392b" }}>سبب الرفض: {raw.rejection_reason}</div>}
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {raw.status !== "published" && <button disabled={busy} onClick={aApprove} className="btn" style={{ background: "#0a7d4f", color: "#fff" }}>✓ قبول ونشر</button>}
+                {raw.status !== "rejected" && <button disabled={busy} onClick={aReject} className="btn btn-outline" style={{ color: "#c0392b", borderColor: "#c0392b" }}>رفض</button>}
+                <button disabled={busy} onClick={aDelete} className="btn btn-outline" style={{ color: "#c0392b", borderColor: "#c0392b" }}>حذف</button>
+              </div>
+              {raw.status === "published" && <AdminFeatureButton l={raw} className="btn btn-outline full" onDone={(m) => { alert(m); reloadRaw(); }} />}
+            </div>
+          )}
           <a className="btn full" href={`tel:${p.phone}`}><Phone size={16} /> اتصل الآن</a>
           <a className="btn btn-wa full" href={waLink(p.phone, p.title)} target="_blank" rel="noreferrer"><MessageCircle size={16} /> واتساب</a>
           {isMine && <Link href={`/my-listings/edit/${id}`} className="btn btn-outline full"><Pencil size={15} /> تعديل الإعلان</Link>}

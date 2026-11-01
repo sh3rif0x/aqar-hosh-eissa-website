@@ -7,7 +7,7 @@ import styles from "./AdvertiserLink.module.css";
 
 const TYPES = { owner: "مالك مباشر", broker: "سمسار / مكتب عقارات", seeker: "مستخدم" };
 
-export default function AdvertiserLink() {
+export default function AdvertiserLink({ side = false }) {
   const { id } = useParams();
   const [a, setA] = useState(null);
 
@@ -27,8 +27,8 @@ export default function AdvertiserLink() {
   const name = a.office_name || a.full_name || "المعلن";
 
   return (
-    <section className={styles.wrap} dir="rtl">
-      <div className={styles.card}>
+    <section className={styles.wrap} dir="rtl" style={side ? { padding: 0, margin: "14px 0", maxWidth: "none", width: "100%" } : undefined}>
+      <div className={styles.card} style={side ? { flexWrap: "wrap", gap: 12, width: "100%", margin: 0, boxSizing: "border-box" } : undefined}>
         <div className={styles.av} style={a.avatar_url ? { backgroundImage: `url(${a.avatar_url})` } : undefined}>
           {!a.avatar_url && name[0]}
         </div>
@@ -36,7 +36,7 @@ export default function AdvertiserLink() {
           <strong>{name}</strong>
           <small>{TYPES[a.account_type] || "معلن"} · {a.listings_count} إعلان منشور</small>
         </div>
-        <Link href={`/profile/${a.id}`} className={styles.btn}>
+        <Link href={`/profile/${a.id}`} className={styles.btn} style={side ? { flexBasis: "100%", width: "100%", textAlign: "center", boxSizing: "border-box" } : undefined}>
           عرض كل إعلانات المعلن
         </Link>
       </div>

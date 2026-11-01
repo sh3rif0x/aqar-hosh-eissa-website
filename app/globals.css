@@ -2022,3 +2022,39 @@ textarea.in {
 .my-item .rej {
     color: #c0392b
 }
+
+/* ===== صفحة الإعلان: صور أكبر + وصف بعرض محدد ===== */
+.detail .gal-main {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  min-height: 380px;
+  max-height: 680px;
+  border-radius: 16px;
+  background-size: cover !important;
+  background-position: center !important;
+}
+.detail .gal-thumbs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.detail .gal-thumbs button {
+  width: 120px;
+  height: 82px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+.detail .gal-thumbs button.on { border-color: #b8731f; }
+.detail .d-desc {
+  max-width: 68ch;
+  line-height: 1.95;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+@media (max-width: 700px) {
+  .detail .gal-main { min-height: 240px; aspect-ratio: 4 / 3; }
+  .detail .gal-thumbs button { width: 84px; height: 60px; }
+}

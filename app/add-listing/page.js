@@ -95,10 +95,11 @@ export default function AddListing() {
  const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 20, maxNativeZoom: 17, attribution: "© Esri" });
  const labels = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 });
  const google = L.tileLayer("https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&hl=ar", { subdomains: "0123", maxZoom: 21, attribution: "© Google" });
+ const googleRoad = L.tileLayer("https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&hl=ar", { subdomains: "0123", maxZoom: 21, attribution: "© Google" });
  const hybrid = L.layerGroup([sat, labels]);
  const streetNames = L.layerGroup([street, L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 })]);
- google.addTo(m);
- L.control.layers({ "قمر صناعي (جوجل)": google, "قمر صناعي + أسماء": hybrid, "خريطة + أسماء": streetNames, "خريطة عادية": street }, null, { position: "topright" }).addTo(m);
+ googleRoad.addTo(m);
+ L.control.layers({ "خريطة جوجل": googleRoad, "قمر صناعي (جوجل)": google, "قمر صناعي + أسماء": hybrid, "خريطة + أسماء": streetNames, "خريطة عادية": street }, null, { position: "topright" }).addTo(m);
  const place = (latlng, zoom) => {
  if (markerRef.current) markerRef.current.setLatLng(latlng);
  else {

@@ -9,6 +9,8 @@ export default function AdminPayments() {
   const [items, setItems] = useState([]);
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
+  const [isSuper, setIsSuper] = useState(false);
+  useEffect(() => { supabase.rpc("get_my_profile").then(({ data }) => setIsSuper(data?.role === "super_admin")); }, []);
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.rpc("admin_list_payments", { p_status: tab, p_limit: 50, p_offset: 0 });
@@ -26,6 +28,24 @@ export default function AdminPayments() {
     if (error) setErr("تعذر تنفيذ العملية"); else load();
   }
 
+  async function revoke(r) {
+    const note = window.prompt("سبب إلغاء التفعيل (اختياري، يظهر للمستخدم):", "");
+    if (note === null) return;
+    if (!window.confirm(r.kind === "feature" ? "إلغاء التمييز وإرجاع الإعلان لوضعه العادي؟" : "إلغاء الباقة وخصم إعلاناتها من حصة المستخدم؟")) return;
+    setBusy(r.id);
+    const { error } = await supabase.rpc("admin_revoke_payment", { p_id: r.id, p_note: note });
+    setBusy("");
+    if (error) setErr(error.message === "forbidden" ? "هذه العملية للسوبر أدمن فقط" : "تعذر إلغاء التفعيل"); else load();
+  }
+
+  async function resetFree(r) {
+    if (!window.confirm("إرجاع هذا المستخدم للباقة المجانية؟ هتتصفّر إعلانات الباقة وتاريخ الانتهاء.")) return;
+    setBusy(r.id);
+    const { error } = await supabase.rpc("admin_set_user_plan", { p_user_id: r.user_id, p_extra_ads: 0, p_expires_at: null });
+    setBusy("");
+    if (error) setErr("تعذر إرجاعه للمجانية"); else { setErr(""); window.alert("تم إرجاع المستخدم للباقة المجانية ✓"); load(); }
+  }
+
   return (
     <div dir="rtl" style={{ padding: 16 }}>
       <h1>طلبات الدفع</h1>
@@ -39,7 +59,7 @@ export default function AdminPayments() {
       <div style={{ display: "grid", gap: 12 }}>
         {items.map((r) => (
           <div key={r.id} style={{ border: "1px solid #e3e7eb", borderRadius: 14, padding: 14 }}>
-            <div><b>{r.user_name || "مستخدم"}</b> — <span dir="ltr">{r.user_phone || "بدون رقم"}</span> • {r.account_type === "broker" ? "سمسار/مكتب" : "مستخدم"}</div>
+            <div><a href={`/profile/${r.user_id}`} target="_blank" rel="noreferrer"><a href={`/profile/${r.user_id}`} target="_blank" rel="noreferrer"><b>{r.user_name || "مستخدم"}</b></a></a> — <span dir="ltr">{r.user_phone || "بدون رقم"}</span> • {r.account_type === "broker" ? "سمسار/مكتب" : "مستخدم"}</div>
             <div>فاتورة <b>#{r.invoice_no}</b> • رقم الحساب: <code>{r.account_id}</code></div>
             <div>
               {r.kind === "feature"
@@ -50,6 +70,15 @@ export default function AdminPayments() {
             {r.transferred_at && r.status === "pending" && <div style={{ color: "#0a7d4f", fontWeight: 700 }}>✓ العميل ضغط «حوّلت المبلغ» — راجع واتساب</div>}
             <small style={{ opacity: .6 }}>{new Date(r.created_at).toLocaleString("ar-EG")}</small>
             {r.admin_note && <div style={{ opacity: .7 }}>ملاحظة: {r.admin_note}</div>}
+            {r.status === "approved" && isSuper && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                {r.kind === "feature"
+                  ? <a href={`/dashboard/plans/featured?q=${encodeURIComponent(r.listing_title || "")}`} style={{ border: "1px solid #0a7d4f", color: "#0a7d4f", borderRadius: 10, padding: "8px 16px", textDecoration: "none" }}>تعديل التمييز</a>
+                  : <a href={`/dashboard/plans?q=${r.account_id}`} style={{ border: "1px solid #0a7d4f", color: "#0a7d4f", borderRadius: 10, padding: "8px 16px", textDecoration: "none" }}>تعديل / ترقية الباقة</a>}
+                {r.kind !== "feature" && <button disabled={busy === r.id} onClick={() => resetFree(r)} style={{ background: "#fff", border: "1px solid #666", color: "#333", borderRadius: 10, padding: "8px 16px" }}>إرجاع للمجانية</button>}
+                <button disabled={busy === r.id} onClick={() => revoke(r)} style={{ background: "#fff", color: "#c0392b", border: "1px solid #c0392b", borderRadius: 10, padding: "8px 16px" }}>إلغاء التفعيل</button>
+              </div>
+            )}
             {r.status === "pending" && (
               <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                 <button disabled={busy === r.id} onClick={() => review(r.id, true)} style={{ background: "#0a7d4f", color: "#fff", border: 0, borderRadius: 10, padding: "8px 16px" }}>تأكيد وتفعيل</button>
