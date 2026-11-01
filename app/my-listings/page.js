@@ -62,7 +62,7 @@ function MyListings() {
       </div>
 
       {edited && <p className="warn">تم حفظ التعديلات. الإعلان الآن «قيد المراجعة» وسيظهر للزوار بعد موافقة الإدارة.</p>}
-      <Link href="/my-profile" className="btn btn-outline"><UserCog size={15} /> تعديل بيانات الحساب</Link>
+      <Link href="/profile" className="btn btn-outline"><UserCog size={15} /> تعديل بيانات الحساب</Link>
       <h3 className="d-sub">إعلاناتي</h3>
       {!list && <div className="card skel" />}
       {list?.length === 0 && <p className="empty">لا توجد إعلانات بعد.</p>}

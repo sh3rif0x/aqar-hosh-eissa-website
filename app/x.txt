@@ -33,28 +33,35 @@
 │   └── page.js
 ├── favorites
 │   └── page.js
+├── featured
+│   └── page.js
 ├── globals.css
+├── icon.png
 ├── layout.js
 ├── layout.js.bak
 ├── layout.js.bak2
 ├── listing
 │   └── [id]
+│       ├── layout.js
 │       └── page.js
 ├── my-listings
 │   ├── edit
 │   │   └── [id]
 │   │       └── page.js
 │   └── page.js
-├── my-profile
+├── notifications
+│   ├── notifications.module.css
 │   └── page.js
 ├── page.js
 ├── page.module.css
 ├── profile
+│   ├── [id]
+│   │   ├── page.js
+│   │   └── public.module.css
 │   ├── me
 │   │   └── page.js
 │   ├── page.js
-│   ├── profile.module.css
-│   └── [username]
+│   └── profile.module.css
 └── x.txt
 
-24 directories, 34 files
+25 directories, 40 files

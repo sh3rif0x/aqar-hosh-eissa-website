@@ -6,8 +6,9 @@
 │   ├── add-listing
 │   │   ├── add.module.css
 │   │   └── page.js
-│   ├── admin
-│   │   └── page.js
+│   ├── api
+│   │   └── track
+│   │       └── route.js
 │   ├── auth
 │   │   ├── auth.module.css
 │   │   ├── page.js
@@ -21,50 +22,66 @@
 │   │   ├── admin
 │   │   │   └── page.js
 │   │   ├── dashboard.module.css
+│   │   ├── layout.js
+│   │   ├── layout.js.bak
+│   │   ├── monitor
+│   │   │   ├── _components
+│   │   │   │   ├── FeatureCard.js
+│   │   │   │   ├── SectionView.js
+│   │   │   │   └── Widgets.js
+│   │   │   ├── page.js
+│   │   │   └── [section]
+│   │   │       └── page.js
+│   │   └── page.js
+│   ├── favorites
+│   │   └── page.js
+│   ├── featured
+│   │   └── page.js
+│   ├── globals.css
+│   ├── icon.png
+│   ├── layout.js
+│   ├── layout.js.bak
+│   ├── layout.js.bak2
+│   ├── listing
+│   │   └── [id]
+│   │       ├── layout.js
+│   │       └── page.js
+│   ├── my-listings
 │   │   ├── edit
 │   │   │   └── [id]
 │   │   │       └── page.js
-│   │   ├── install-dashboard.js
-│   │   ├── layout.js
-│   │   ├── new
-│   │   │   └── page.js
-│   │   ├── page.js
-│   │   ├── profile
-│   │   │   └── page.js
-│   │   └── x.txt
-│   ├── favicon.ico
-│   ├── favorites
 │   │   └── page.js
-│   ├── globals.css
-│   ├── layout.js
-│   ├── listing
-│   │   └── [id]
-│   │       └── page.js
-│   ├── my-listings
+│   ├── notifications
+│   │   ├── notifications.module.css
 │   │   └── page.js
 │   ├── page.js
+│   ├── page.js.bak
 │   ├── page.module.css
-│   └── profile
-│       ├── me
-│       │   └── page.js
-│       ├── page.js
-│       ├── profile.module.css
-│       └── [username]
+│   ├── profile
+│   │   ├── [id]
+│   │   │   ├── page.js
+│   │   │   └── public.module.css
+│   │   ├── me
+│   │   │   └── page.js
+│   │   ├── page.js
+│   │   └── profile.module.css
+│   └── x.txt
 ├── components
 │   ├── About.js
 │   ├── AccountTypeBadge.js
 │   ├── AccountTypeGate.js
 │   ├── AccountTypeGate.module.css
+│   ├── AdvertiserLink.js
+│   ├── AdvertiserLink.module.css
+│   ├── BlockGuard.js
 │   ├── CategoryBar.js
 │   ├── CtaBanner.js
-│   ├── CtaBanner.js.bak3
 │   ├── DashboardGuard.js
 │   ├── DbSection.js
 │   ├── Faq.js
-│   ├── Faq.js.bak3
+│   ├── FeaturedSection.js
 │   ├── Footer.js
 │   ├── HeaderActions.js
-│   ├── HeaderActions.js.bak2
 │   ├── HeaderActions.module.css
 │   ├── Hero
 │   │   ├── Hero.js
@@ -75,10 +92,10 @@
 │   ├── ListingActions.module.css
 │   ├── MyProfileLink.js
 │   ├── Navbar.js
-│   ├── Navbar.js.bak3
 │   ├── PropertyCard.js
 │   ├── PropertySection.js
 │   ├── SearchBox.js
+│   ├── Tracker.js
 │   └── Trust.js
 ├── install-header.js
 ├── install-hero.js
@@ -87,11 +104,29 @@
 ├── lib
 │   ├── api.js
 │   ├── AuthContext.js
+│   ├── cloudinary.js
 │   ├── config.js
 │   ├── data.js
 │   ├── data.js.bak
+│   ├── monitor
+│   │   ├── core.js
+│   │   ├── dsl.js
+│   │   ├── ingest.js
+│   │   ├── registry.js
+│   │   └── sections
+│   │       ├── audit.js
+│   │       ├── behavior.js
+│   │       ├── health.js
+│   │       ├── listings.js
+│   │       ├── live.js
+│   │       ├── reports.js
+│   │       ├── security.js
+│   │       ├── users.js
+│   │       └── visitors.js
 │   ├── normalize.js
-│   └── supabase.js
+│   ├── payment.js
+│   ├── supabase.js
+│   └── track.js
 ├── next.config.mjs
 ├── node_modules
 │   ├── abort-controller
@@ -39057,17 +39092,35 @@
 ├── open-next.config.ts
 ├── package.json
 ├── package-lock.json
-├── page.js
 ├── public
-│   └── hero
-│       ├── hero-img1.png
-│       ├── hero-img2.png
-│       ├── hero-img3.png
-│       └── hero-img4.png
+│   ├── e42.png
+│   ├── Glossy Orange Arabic Real Estate Logo.png
+│   ├── hero
+│   │   ├── hero-img1.png
+│   │   ├── hero-img2.png
+│   │   ├── hero-img3.png
+│   │   └── hero-img4.png
+│   └── logo.png
 ├── README.md
 ├── scripts
 │   └── seed.mjs
+├── supabase
+│   ├── block-fix.sql
+│   ├── monitor.sql
+│   └── supabase
+│       ├── config.toml
+│       ├── functions
+│       │   ├── admin-stats
+│       │   │   └── index.ts
+│       │   ├── cleanup-listing-images
+│       │   │   └── index.ts
+│       │   ├── cloudinary-sign
+│       │   │   └── index.ts
+│       │   └── notify-listing-status
+│       │       └── index.ts
+│       └── migrations
+│           └── 20260101000000_monitor.sql
 ├── wrangler.jsonc
 └── x.txt
 
-3564 directories, 35507 files
+3578 directories, 35546 files

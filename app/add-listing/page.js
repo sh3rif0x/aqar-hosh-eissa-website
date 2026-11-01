@@ -8,6 +8,7 @@ import { VODA, WA } from "@/lib/payment";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import "leaflet/dist/leaflet.css";
 import s from "./add.module.css";
+import UpgradePopup from "@/components/UpgradePopup";
 
 const FEATURES = [["gas","غاز"],["water","مياه"],["electricity","كهرباء"],["wifi","واي فاي"],["elevator","أسانسير"],["parking","جراج"]];
 const DURATIONS = [30, 60, 90, 180, 365];
@@ -29,14 +30,8 @@ function FeaturedPromo() {
   return (
     <div style={{ background: "#fff7e6", border: "1px solid #b8731f", borderRadius: 12, padding: 16, marginBottom: 16, lineHeight: 1.9 }}>
       <b>⭐ ميّز إعلانك بـ 50 جنيه فقط</b>
-      <ol style={{ margin: "8px 0", paddingInlineStart: 20 }}>
-        <li>حوّل 50 جنيه على فودافون كاش: <b dir="ltr">{VODA}</b></li>
-        <li>صوّر شاشة التحويل (سكرين شوت).</li>
-        <li>ابعتها على واتساب مع <b>لينك الإعلان</b> اللي عايز تميّزه.</li>
-        <li>هنفعّل التمييز يدوياً بعد مراجعة التحويل.</li>
-      </ol>
-      <Link href="/featured" style={{ marginInlineEnd: 12 }}>التفاصيل والأسعار</Link>
-      <a href={`https://wa.me/${WA}`} target="_blank" rel="noreferrer" style={{ marginInlineEnd: 12 }}>إرسال عبر واتساب</a>
+      <p style={{ margin: "8px 0" }}>اجعل إعلانك في الأعلى بشارة «مميز» لمدة 30 يومًا، والدفع بسهولة من صفحة الباقات.</p>
+      <Link href="/pricing" style={{ marginInlineEnd: 12 }}>ميّز إعلانك الآن</Link>
       <button type="button" onClick={close}>إغلاق</button>
     </div>
   );
@@ -63,6 +58,7 @@ export default function AddListing() {
   const [regions, setRegions] = useState([]);
   const [allowed, setAllowed] = useState(null);
   const [quota, setQuota] = useState(null);
+  const [showUp, setShowUp] = useState(false);
   const [f, setF] = useState({
     deal_type: "sale", group: "residential", category_id: "", title: "", price: "", area: "", area_unit: "sqm",
     rooms: "", bathrooms: "", floor: "", finishing: "", furnishing: "", features: [], region_id: "",
@@ -127,7 +123,7 @@ export default function AddListing() {
     if (!f.price || Number(f.price) <= 0) return setErr("اكتب السعر");
     if (!f.area || Number(f.area) <= 0) return setErr("اكتب المساحة");
     if (!f.region_id) return setErr("اختر المنطقة");
-    if (quota && quota.remaining <= 0) return setErr(quotaMsg(quota));
+    if (quota && quota.remaining <= 0) { if (quota.account_type === "broker") setShowUp(true); else setErr(quotaMsg(quota)); return; }
     if (!phone) return setErr("رقم الموبايل غير صحيح (مثال: 01012345678)");
     if (files.length < 1) return setErr("أضف صورة واحدة على الأقل");
     setBusy(true);
@@ -156,7 +152,7 @@ export default function AddListing() {
       const m = x?.message || "";
       setErr(
         m.includes("owner_monthly_limit") ? quotaMsg({ account_type: "owner" }) :
-        m.includes("broker_quota_exceeded") ? quotaMsg({ account_type: "broker" }) :
+        m.includes("quota_exceeded") ? (setShowUp(true), "") :
         (m || "حدث خطأ، حاول مرة أخرى")
       );
       setBusy(false);
@@ -174,7 +170,7 @@ export default function AddListing() {
       <h1>أضف إعلان جديد</h1>
       <FeaturedPromo />
       <p className={s.sub}>اعرض عقارك على آلاف المهتمين مجاناً</p>
-      {quota && (
+      {quota && quota.remaining > 0 && (
         <p className={s.note}>
           {quota.remaining > 0
             ? `متبقي لك ${quota.remaining} من ${quota.limit} إعلان ${quota.period === "month" ? "هذا الشهر" : ""}`
@@ -255,8 +251,9 @@ export default function AddListing() {
         </section>
         {err && <p className={s.err}>{err}</p>}
         <p className={s.note}>سيتم مراجعة إعلانك من قبل فريقنا قبل نشره — تستغرق المراجعة عادةً 24 ساعة</p>
-        <button className={s.btn} disabled={busy || (quota && quota.remaining <= 0)}>{busy ? "جارٍ النشر..." : "نشر الإعلان"}</button>
+        <button className={s.btn} disabled={busy || (quota && quota.account_type !== "broker" && quota.remaining <= 0)}>{busy ? "جارٍ النشر..." : "نشر الإعلان"}</button>
       </form>
+      <UpgradePopup open={showUp} onClose={() => setShowUp(false)} mode="quota" />
     </main>
   );
 }
