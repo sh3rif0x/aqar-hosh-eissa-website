@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
 import { VODA, WA } from "@/lib/payment";
+import { uploadToCloudinary } from "@/lib/cloudinary";
 import "leaflet/dist/leaflet.css";
 import s from "./add.module.css";
 
@@ -146,11 +147,8 @@ export default function AddListing() {
         if (e2) throw e2;
       }
       for (let i = 0; i < files.length; i++) {
-        const ext = files[i].type === "image/png" ? "png" : "jpg";
-        const path = `${user.id}/${l.id}/${Date.now()}-${i}.${ext}`;
-        const up = await supabase.storage.from("listing-images").upload(path, files[i], { contentType: files[i].type });
-        if (up.error) throw up.error;
-        const { error: e3 } = await supabase.from("listing_images").insert({ listing_id: l.id, storage_path: path, sort_order: i });
+        const url = await uploadToCloudinary(files[i]);
+        const { error: e3 } = await supabase.from("listing_images").insert({ listing_id: l.id, storage_path: url, sort_order: i });
         if (e3) throw e3;
       }
       router.push("/dashboard?added=1");
