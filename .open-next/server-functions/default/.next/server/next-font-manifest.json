@@ -44,7 +44,27 @@
       "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
     ],
+    "[project]/app/dashboard/payments/page": [
+      "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
+      "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
+    ],
+    "[project]/app/dashboard/plans/featured/page": [
+      "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
+      "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
+    ],
+    "[project]/app/dashboard/plans/page": [
+      "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
+      "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
+    ],
+    "[project]/app/dashboard/plans/payments/page": [
+      "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
+      "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
+    ],
     "[project]/app/favorites/page": [
+      "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
+      "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
+    ],
+    "[project]/app/featured/page": [
       "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
     ],
@@ -60,15 +80,19 @@
       "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
     ],
-    "[project]/app/my-profile/page": [
-      "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
-      "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
-    ],
     "[project]/app/notifications/page": [
       "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
     ],
     "[project]/app/page": [
+      "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
+      "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
+    ],
+    "[project]/app/pay/page": [
+      "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
+      "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
+    ],
+    "[project]/app/pricing/page": [
       "static/media/4fb4363ca5982ca4-s.p.40_3w74kn95bo.woff2",
       "static/media/f9a7f4f17784fbaa-s.p.08tn9snzkmifr.woff2"
     ],

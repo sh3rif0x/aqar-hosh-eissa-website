@@ -135,10 +135,40 @@
       "namedRegex": "^/dashboard/monitor(?:/)?$"
     },
     {
+      "page": "/dashboard/payments",
+      "regex": "^/dashboard/payments(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/payments(?:/)?$"
+    },
+    {
+      "page": "/dashboard/plans",
+      "regex": "^/dashboard/plans(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/plans(?:/)?$"
+    },
+    {
+      "page": "/dashboard/plans/featured",
+      "regex": "^/dashboard/plans/featured(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/plans/featured(?:/)?$"
+    },
+    {
+      "page": "/dashboard/plans/payments",
+      "regex": "^/dashboard/plans/payments(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/plans/payments(?:/)?$"
+    },
+    {
       "page": "/favorites",
       "regex": "^/favorites(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/favorites(?:/)?$"
+    },
+    {
+      "page": "/featured",
+      "regex": "^/featured(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/featured(?:/)?$"
     },
     {
       "page": "/icon.png",
@@ -153,16 +183,22 @@
       "namedRegex": "^/my\\-listings(?:/)?$"
     },
     {
-      "page": "/my-profile",
-      "regex": "^/my\\-profile(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/my\\-profile(?:/)?$"
-    },
-    {
       "page": "/notifications",
       "regex": "^/notifications(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/notifications(?:/)?$"
+    },
+    {
+      "page": "/pay",
+      "regex": "^/pay(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/pay(?:/)?$"
+    },
+    {
+      "page": "/pricing",
+      "regex": "^/pricing(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/pricing(?:/)?$"
     },
     {
       "page": "/profile",

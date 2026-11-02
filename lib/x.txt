@@ -1,0 +1,32 @@
+.
+├── api.js
+├── arabic.js
+├── arabic.js.bak1
+├── arabic.js.bak2
+├── AuthContext.js
+├── cloudinary.js
+├── config.js
+├── data.js
+├── data.js.bak
+├── monitor
+│   ├── core.js
+│   ├── dsl.js
+│   ├── ingest.js
+│   ├── registry.js
+│   └── sections
+│       ├── audit.js
+│       ├── behavior.js
+│       ├── health.js
+│       ├── listings.js
+│       ├── live.js
+│       ├── reports.js
+│       ├── security.js
+│       ├── users.js
+│       └── visitors.js
+├── normalize.js
+├── payment.js
+├── supabase.js
+├── track.js
+└── x.txt
+
+3 directories, 27 files
